@@ -148,6 +148,7 @@ async function processEvent(event: CacheEvent, actions: StoreActions): Promise<v
         actions.updateAgent(data.agent_id as string, {
           status: 'complete',
           completedAt: new Date().toISOString(),
+          output: data.output_summary as Record<string, unknown> | undefined,
         });
       }
       break;

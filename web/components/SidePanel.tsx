@@ -184,6 +184,16 @@ export function SidePanel({ agent, onClose }: SidePanelProps) {
           </div>
         )}
 
+        {/* Agent Output */}
+        {agent.output && Object.keys(agent.output).length > 0 && (
+          <div className="p-4 bg-green-50 rounded-lg border border-green-100">
+            <h3 className="text-xs font-semibold text-green-600 uppercase mb-2">Output</h3>
+            <pre className="text-xs bg-white p-3 rounded-lg overflow-x-auto max-h-64 overflow-y-auto">
+              {JSON.stringify(agent.output, null, 2)}
+            </pre>
+          </div>
+        )}
+
         {/* Error */}
         {agent.error && (
           <div className="p-4 bg-red-50 rounded-lg border border-red-100">

@@ -126,6 +126,7 @@ export function useSafeSFWebSocket() {
           updateAgent(message.agent_id, {
             status: message.status === 'completed' ? 'complete' : (message.status as Agent['status']),
             completedAt: new Date().toISOString(),
+            output: message.output_summary,
           });
         }
         console.log('[WS] Agent complete:', message.agent_id);

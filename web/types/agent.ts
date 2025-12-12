@@ -22,6 +22,7 @@ export interface Agent {
   startedAt: string;
   completedAt?: string;
   error?: string;
+  output?: Record<string, unknown>;
 }
 
 export interface Coordinate {
