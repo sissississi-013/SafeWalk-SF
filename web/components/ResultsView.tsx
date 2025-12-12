@@ -4,9 +4,29 @@
 
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useAgentStore } from '@/store/agentStore';
 import { SafetyScoreCard } from './SafetyScoreCard';
 import { MapPin, Database, Clock, Route } from 'lucide-react';
+
+// Dynamic imports for map components (client-side only)
+const SafetyMap = dynamic(() => import('./SafetyMap').then(mod => ({ default: mod.SafetyMap })), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[400px] bg-gray-100 rounded-lg flex items-center justify-center">
+      <div className="text-gray-500">Loading map...</div>
+    </div>
+  ),
+});
+
+const CategoryHeatMaps = dynamic(() => import('./CategoryHeatMaps').then(mod => ({ default: mod.CategoryHeatMaps })), {
+  ssr: false,
+  loading: () => (
+    <div className="h-32 bg-gray-100 rounded-lg flex items-center justify-center">
+      <div className="text-gray-500">Loading categories...</div>
+    </div>
+  ),
+});
 
 export function ResultsView() {
   const { finalResult, flowTrace, duration } = useAgentStore();
@@ -104,44 +124,28 @@ export function ResultsView() {
           incidentBreakdown={finalResult.incident_breakdown}
         />
 
-        {/* Coordinates Preview (Simple Map Placeholder) */}
+        {/* Interactive Map with All Incidents */}
         {finalResult.coordinates && finalResult.coordinates.length > 0 && (
           <div className="bg-white rounded-lg p-4 border border-gray-200">
             <h3 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
               <MapPin className="w-4 h-4" />
               Incident Locations ({finalResult.coordinates.length} points)
             </h3>
-            <div className="h-[300px] bg-gray-100 rounded-lg flex items-center justify-center relative overflow-hidden">
-              {/* Simple scatter visualization */}
-              <div className="absolute inset-4">
-                {finalResult.coordinates.slice(0, 100).map((coord, index) => {
-                  // Normalize coordinates to fit in the container
-                  // SF coordinates: lat ~37.7-37.8, lng ~-122.5 to -122.35
-                  const x = ((coord.longitude + 122.5) / 0.15) * 100;
-                  const y = ((37.82 - coord.latitude) / 0.12) * 100;
-                  return (
-                    <div
-                      key={index}
-                      className="absolute w-2 h-2 bg-red-500 rounded-full opacity-60"
-                      style={{
-                        left: `${Math.max(0, Math.min(100, x))}%`,
-                        top: `${Math.max(0, Math.min(100, y))}%`,
-                      }}
-                      title={`${coord.latitude}, ${coord.longitude}`}
-                    />
-                  );
-                })}
-              </div>
-              <div className="absolute bottom-2 right-2 bg-white/80 px-2 py-1 rounded text-xs text-gray-500">
-                San Francisco, CA
-              </div>
-            </div>
-            {finalResult.coordinates.length > 100 && (
-              <p className="text-xs text-gray-500 mt-2">
-                Showing first 100 of {finalResult.coordinates.length} points
-              </p>
-            )}
+            <SafetyMap
+              coordinates={finalResult.coordinates}
+              height="400px"
+              showHeatMap={true}
+            />
           </div>
+        )}
+
+        {/* Category Heat Maps */}
+        {(finalResult.incident_breakdown || (finalResult.data && finalResult.data.length > 0)) && (
+          <CategoryHeatMaps
+            coordinates={finalResult.coordinates || []}
+            data={finalResult.data || []}
+            incidentBreakdown={finalResult.incident_breakdown}
+          />
         )}
 
         {/* Data Table Preview */}

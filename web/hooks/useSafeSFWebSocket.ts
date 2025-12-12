@@ -7,13 +7,25 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAgentStore } from '@/store/agentStore';
 import type { WebSocketMessage, Agent, ToolCall } from '@/types/agent';
+import {
+  isCacheEnabled,
+  getCache,
+  createRecorder,
+  recordEvent,
+  finalizeRecording,
+  replayCache,
+  type CacheRecorder,
+  type CacheEventType,
+} from '@/lib/cache';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8765';
 
 export function useSafeSFWebSocket() {
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
+  const recorderRef = useRef<CacheRecorder | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isReplaying, setIsReplaying] = useState(false);
 
   const {
     setSessionStatus,
@@ -28,8 +40,19 @@ export function useSafeSFWebSocket() {
     reset,
   } = useAgentStore();
 
-  const handleEvent = useCallback((message: WebSocketMessage) => {
+  const handleEvent = useCallback((message: WebSocketMessage, shouldRecord = true) => {
     const eventType = message.type;
+
+    // Record event if we have an active recorder
+    if (shouldRecord && recorderRef.current && !recorderRef.current.isFinalized) {
+      const recordableTypes: CacheEventType[] = [
+        'session_started', 'agent_spawned', 'tool_called', 'tool_result',
+        'data_received', 'agent_complete', 'session_complete', 'session_error', 'final_result'
+      ];
+      if (recordableTypes.includes(eventType as CacheEventType)) {
+        recordEvent(recorderRef.current, eventType as CacheEventType, message as unknown as Record<string, unknown>);
+      }
+    }
 
     switch (eventType) {
       case 'session_started':
@@ -129,6 +152,11 @@ export function useSafeSFWebSocket() {
             incident_breakdown: message.final_response.incident_breakdown,
           });
         }
+        // Finalize recording if active
+        if (recorderRef.current && !recorderRef.current.isFinalized) {
+          finalizeRecording(recorderRef.current);
+          recorderRef.current = null;
+        }
         console.log('[WS] Session complete:', message.duration_ms, 'ms');
         break;
 
@@ -137,7 +165,7 @@ export function useSafeSFWebSocket() {
         console.error('[WS] Session error:', message.error);
         break;
 
-      case 'final_result':
+      case 'final_result': {
         // Handle final_result from SafeSF server
         setSessionStatus('complete');
         if (message.duration_ms) {
@@ -159,8 +187,14 @@ export function useSafeSFWebSocket() {
           sql: result.sql as string | undefined,
           incident_breakdown: result.incident_breakdown as Record<string, number> | undefined,
         });
+        // Finalize recording if active
+        if (recorderRef.current && !recorderRef.current.isFinalized) {
+          finalizeRecording(recorderRef.current);
+          recorderRef.current = null;
+        }
         console.log('[WS] Final result received');
         break;
+      }
 
       case 'error':
         setSessionStatus('error', undefined, message.error);
@@ -237,10 +271,28 @@ export function useSafeSFWebSocket() {
     }
   }, []);
 
-  const startSession = useCallback((query: string) => {
+  const startSession = useCallback(async (query: string) => {
     console.log('[WS] Resetting session state for new query');
     reset();
 
+    // Check cache first
+    if (isCacheEnabled()) {
+      const cached = getCache(query);
+      if (cached) {
+        console.log('[Cache] Hit! Replaying cached session...');
+        setIsReplaying(true);
+        try {
+          await replayCache(cached);
+        } finally {
+          setIsReplaying(false);
+        }
+        return;
+      }
+      console.log('[Cache] Miss. Starting live session with recording...');
+      recorderRef.current = createRecorder(query);
+    }
+
+    // No cache or cache disabled - send to WebSocket
     sendMessage({
       action: 'query',
       query,
@@ -265,6 +317,7 @@ export function useSafeSFWebSocket() {
 
   return {
     isConnected,
+    isReplaying,
     startSession,
     sendMessage,
   };
