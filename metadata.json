@@ -1,0 +1,7 @@
+{
+  "name": "SafeWalk SF",
+  "description": "An AI-powered navigation assistant that generates safe, scenic, and efficient walking routes in San Francisco.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
