@@ -108,9 +108,12 @@ export function useSafeSFWebSocket() {
           const agent = agents.find(a => a.id === message.agent_id);
           const runningTool = agent?.toolCalls.find(tc => tc.status === 'running');
           if (runningTool) {
+            // Capture the full result data from tool_result, data, or coordinates
+            const resultData = message.tool_result || message.data || message.coordinates || null;
             completeToolCall(message.agent_id, runningTool.id, {
               status: 'complete',
               rowCount: message.row_count,
+              result: resultData,
             });
           }
         }
