@@ -84,11 +84,10 @@ def print_result(result: dict):
     print(f"\nData Retrieved: {len(data)} records")
     print(f"Coordinates: {len(coordinates)} points")
 
-    # Print sample data
     if data:
-        print("\nSample Data (first 3 records):")
+        print("\Data (first 3 records):")
         for i, record in enumerate(data[:3], 1):
-            print(f"  {i}. {json.dumps(record, default=str)[:100]}...")
+            print(f"  {i}. {json.dumps(record, default=str)[:500]}...")
 
     # Print coordinates (first 10)
     if coordinates:
