@@ -28,6 +28,14 @@ export interface Agent {
 export interface Coordinate {
   latitude: number;
   longitude: number;
+  category?: string;
+}
+
+export interface SQLQuery {
+  query: string;
+  sql: string;
+  rowCount?: number;
+  rows?: Record<string, unknown>[];
 }
 
 export interface IncidentRecord {
@@ -53,6 +61,7 @@ export interface SafetyResult {
   coordinates: Coordinate[];
   data: IncidentRecord[];
   sql?: string;
+  sqlQueries?: SQLQuery[];
   incident_breakdown?: Record<string, number>;
 }
 

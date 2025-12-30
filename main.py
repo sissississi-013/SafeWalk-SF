@@ -10,10 +10,8 @@ import asyncio
 import json
 import logging
 import sys
-from datetime import datetime
 
-from safesf_agent.agent import SafeSFAgent
-from safesf_agent.utils.event_emitter import EventEmitter, Event
+from safesf_agent.agent import process_request
 from safesf_agent.config import validate_config
 
 
@@ -38,31 +36,6 @@ def print_header():
     """)
 
 
-def print_event(event: Event):
-    """Print event to console."""
-    event_type = event.type.value
-    data = event.data
-
-    # Format based on event type
-    if event_type == "session_started":
-        print(f"\n[Session] Started: {data.get('request_id')}")
-    elif event_type == "agent_spawned":
-        print(f"  [+] Agent: {data.get('agent_id')} ({data.get('agent_type')})")
-        print(f"      Input: {data.get('input_id')}")
-        print(f"      Task: {data.get('description')}")
-    elif event_type == "tool_called":
-        print(f"      Tool: {data.get('tool_name')} called")
-    elif event_type == "tool_result":
-        print(f"      Result: {data.get('row_count')} rows returned")
-    elif event_type == "data_received":
-        print(f"      Data: {data.get('row_count')} points with {len(data.get('coordinates', []))} coordinates")
-    elif event_type == "agent_complete":
-        print(f"  [-] Agent {data.get('agent_id')} completed ({data.get('status')})")
-    elif event_type == "session_complete":
-        print(f"\n[Session] Completed in {data.get('duration_ms')}ms")
-        print(f"  Flow: {' -> '.join(data.get('flow_trace', []))}")
-
-
 def print_result(result: dict):
     """Print the final result."""
     print("\n" + "=" * 65)
@@ -73,63 +46,70 @@ def print_result(result: dict):
         print(f"\nError: {result.get('error')}")
         return
 
-    # Print flow trace
-    flow_trace = result.get("flow_trace", [])
-    print(f"\nFlow Trace: {' -> '.join(flow_trace)}")
-    print(f"Duration: {result.get('duration_ms', 0)}ms")
+    # Print safety score
+    if result.get("safety_score") is not None:
+        score = result.get("safety_score")
+        rating = result.get("rating", "Unknown")
+        color = result.get("rating_color", "")
+        print(f"\nSafety Score: {score}/100 ({rating})")
+
+    # Print location
+    location = result.get("location")
+    if location:
+        print(f"\nLocation: {location.get('name')}")
+        print(f"  Neighborhood: {location.get('neighborhood')}")
+        print(f"  Coordinates: {location.get('latitude')}, {location.get('longitude')}")
+
+    # Print analysis
+    analysis = result.get("analysis")
+    if analysis:
+        print(f"\nAnalysis:")
+        if isinstance(analysis, dict):
+            print(f"  Overview: {analysis.get('overview', '')}")
+            concerns = analysis.get('primary_concerns', [])
+            if concerns:
+                print(f"  Primary Concerns: {', '.join(concerns)}")
+            breakdown = analysis.get('incident_breakdown', {})
+            if breakdown:
+                print(f"  Incident Breakdown:")
+                for key, val in breakdown.items():
+                    print(f"    - {key}: {val}")
+        else:
+            print(f"  {analysis}")
+
+    # Print recommendations
+    recommendations = result.get("recommendations", [])
+    if recommendations:
+        print("\nRecommendations:")
+        for i, rec in enumerate(recommendations, 1):
+            print(f"  {i}. {rec}")
 
     # Print data summary
     data = result.get("data", [])
     coordinates = result.get("coordinates", [])
-    print(f"\nData Retrieved: {len(data)} records")
-    print(f"Coordinates: {len(coordinates)} points")
+    if data or coordinates:
+        print(f"\nData Retrieved: {len(data)} records, {len(coordinates)} coordinates")
 
-    if data:
-        print("\Data (first 3 records):")
-        for i, record in enumerate(data[:3], 1):
-            print(f"  {i}. {json.dumps(record, default=str)[:500]}...")
-
-    # Print coordinates (first 10)
-    if coordinates:
-        print(f"\nCoordinates (first 10):")
-        for coord in coordinates[:10]:
-            print(f"  - lat: {coord.get('latitude')}, long: {coord.get('longitude')}")
-
-    # Print analysis
-    if result.get("analysis"):
-        print(f"\nAnalysis:")
-        print(f"  {result.get('analysis')}")
-
-    if result.get("safety_score"):
-        print(f"\nSafety Score: {result.get('safety_score')}/100")
-
-    if result.get("recommendations"):
-        print("\nRecommendations:")
-        for i, rec in enumerate(result.get("recommendations", []), 1):
-            print(f"  {i}. {rec}")
-
-    # Print SQL
+    # Print SQL if available
     if result.get("sql"):
         print(f"\nGenerated SQL:")
-        print(f"  {result.get('sql')[:200]}...")
+        sql = result.get("sql")
+        print(f"  {sql[:200]}..." if len(sql) > 200 else f"  {sql}")
+
+    # Print duration
+    if result.get("duration_ms"):
+        print(f"\nCompleted in {result.get('duration_ms')}ms")
 
     print("\n" + "=" * 65)
 
 
-async def run_query(query: str, show_events: bool = True):
+async def run_query(query: str):
     """Run a single query."""
-    # Create event emitter with console output
-    event_emitter = EventEmitter()
-    if show_events:
-        event_emitter.add_listener(print_event)
+    print(f"\nProcessing: {query}")
+    print("-" * 65)
 
-    # Create agent and process query
-    agent = SafeSFAgent(event_emitter=event_emitter)
-    result = await agent.process_request(query)
-
-    # Print result
+    result = await process_request({"query": query})
     print_result(result)
-
     return result
 
 
@@ -154,12 +134,11 @@ async def interactive_mode():
             if query.lower() == "help":
                 print("""
 Example queries:
-  - "What crimes happened near lat 37.78, long -122.40?"
   - "Is it safe near Ferry Building?"
-  - "Show me dangerous areas in the Mission"
-  - "What are the safest neighborhoods in SF?"
-  - "Traffic accidents in Tenderloin this month"
-  - "Encampments near Union Square"
+  - "How dangerous is the Mission District?"
+  - "What crimes happened near Union Square?"
+  - "Show me incidents in Tenderloin"
+  - "Is it safe to walk in SOMA at night?"
                 """)
                 continue
 
@@ -194,11 +173,6 @@ def main():
         action="store_true",
         help="Enable debug logging",
     )
-    parser.add_argument(
-        "--no-events",
-        action="store_true",
-        help="Suppress event output",
-    )
 
     args = parser.parse_args()
 
@@ -224,7 +198,7 @@ def main():
         server_main()
     elif args.query:
         # Run single query
-        asyncio.run(run_query(args.query, show_events=not args.no_events))
+        asyncio.run(run_query(args.query))
     else:
         # Interactive mode
         asyncio.run(interactive_mode())

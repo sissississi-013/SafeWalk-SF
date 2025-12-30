@@ -1,0 +1,132 @@
+{
+  "description": "Working queries tested against Snow Leopard API for SafeSF",
+  "tested_date": "2024-12-29",
+  "queries": [
+    {
+      "category": "coordinate_radius",
+      "queries": [
+        "Show all incidents within 0.005 degrees of latitude 37.7749 and longitude -122.4194",
+        "Find crimes where latitude is between 37.77 and 37.78 and longitude is between -122.42 and -122.41",
+        "Get incidents within 0.01 degrees of 37.785, -122.409",
+        "Show assaults where latitude > 37.76 and latitude < 37.79 and longitude > -122.43 and longitude < -122.40",
+        "Find all incidents near coordinates 37.7849, -122.4094 within 500 meters"
+      ]
+    },
+    {
+      "category": "neighborhood",
+      "queries": [
+        "Show all incidents in the Mission District",
+        "Find crimes in Tenderloin neighborhood",
+        "Get incidents in Financial District",
+        "Show assaults in SOMA neighborhood",
+        "Find robberies in Chinatown",
+        "Get all incidents in Castro neighborhood",
+        "Show crimes in Noe Valley",
+        "Find incidents in Marina District",
+        "Get burglaries in Pacific Heights",
+        "Show vehicle thefts in Sunset District"
+      ]
+    },
+    {
+      "category": "incident_type",
+      "queries": [
+        "Show all assault incidents in San Francisco",
+        "Find all robbery incidents",
+        "Get all burglary reports",
+        "Show motor vehicle theft incidents",
+        "Find all homicide cases",
+        "Get weapon-related incidents",
+        "Show all larceny theft incidents",
+        "Find drug/narcotic incidents",
+        "Get all vandalism reports",
+        "Show fraud incidents"
+      ]
+    },
+    {
+      "category": "address_search",
+      "queries": [
+        "Find incidents where address contains Market",
+        "Show crimes on Mission Street",
+        "Get incidents near Powell Street",
+        "Find assaults where address contains Geary",
+        "Show incidents on Van Ness Avenue",
+        "Get crimes where address contains Broadway"
+      ]
+    },
+    {
+      "category": "time_based",
+      "queries": [
+        "Show incidents from the last 30 days",
+        "Find crimes in 2024",
+        "Get incidents from January 2024",
+        "Show assaults from the past 6 months",
+        "Find incidents between 2023-01-01 and 2023-12-31"
+      ]
+    },
+    {
+      "category": "aggregation",
+      "queries": [
+        "Count incidents by category",
+        "Show top 10 neighborhoods by crime count",
+        "Get incident counts grouped by month",
+        "Count assaults by neighborhood",
+        "Show robbery counts by year"
+      ]
+    },
+    {
+      "category": "severity",
+      "queries": [
+        "Show fatal collision incidents",
+        "Find severe injury collisions",
+        "Get collisions with injuries",
+        "Show traffic incidents with fatalities"
+      ]
+    },
+    {
+      "category": "encampments",
+      "queries": [
+        "Show homeless encampment reports",
+        "Find encampment reports in Tenderloin",
+        "Get 311 encampment service requests",
+        "Show encampment reports near coordinates 37.78, -122.41"
+      ]
+    },
+    {
+      "category": "combined_filters",
+      "queries": [
+        "Show assaults in Mission District from 2024",
+        "Find robberies in Tenderloin within 0.005 degrees of 37.783, -122.412",
+        "Get burglaries in SOMA from the last 90 days",
+        "Show vehicle thefts in Financial District in 2024",
+        "Find drug incidents in Tenderloin neighborhood from 2023"
+      ]
+    },
+    {
+      "category": "limit_queries",
+      "queries": [
+        "Show the 100 most recent incidents",
+        "Get top 50 assaults by date",
+        "Find 200 incidents in Mission District",
+        "Show latest 100 robberies"
+      ]
+    }
+  ],
+  "notes": {
+    "working_patterns": [
+      "Coordinate-based radius searches work well",
+      "Neighborhood name filtering is reliable",
+      "Incident category filtering works",
+      "Address contains searches work",
+      "Date range filtering works",
+      "Aggregation queries (COUNT, GROUP BY) work",
+      "Combined filters work when properly structured"
+    ],
+    "problematic_patterns": [
+      "Direct street name queries without 'address contains' may fail",
+      "Time of day queries (morning, evening, night) don't work",
+      "Very specific intersection queries may not return results",
+      "Natural language location descriptions need conversion to coordinates"
+    ],
+    "recommended_radius": "0.005 degrees (~500m) for city center, 0.01 degrees (~1km) for broader areas"
+  }
+}
