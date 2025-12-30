@@ -1,7 +1,3 @@
-/**
- * Custom ReactFlow node for SafeSF agents.
- */
-
 'use client';
 
 import { memo, useState } from 'react';
@@ -9,7 +5,6 @@ import { Handle, Position } from '@xyflow/react';
 import { MapPin, Database, FileText, Brain, ChevronDown, ChevronRight, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 import type { Agent, ToolCall } from '@/types/agent';
 
-// Agent type configuration
 const AGENT_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
   'orchestrator': { icon: Brain, label: 'Orchestrator', color: 'purple' },
   'location-resolver': { icon: MapPin, label: 'Location Resolver', color: 'blue' },
@@ -17,7 +12,6 @@ const AGENT_CONFIG: Record<string, { icon: React.ElementType; label: string; col
   'summary-agent': { icon: FileText, label: 'Summary Agent', color: 'orange' },
 };
 
-// Status styles
 const STATUS_STYLES: Record<string, string> = {
   pending: 'border-gray-400 bg-gray-50',
   running: 'border-orange-400 bg-orange-50',
@@ -103,7 +97,6 @@ function SafetyAgentNodeComponent({ data }: SafetyAgentNodeProps) {
 
   return (
     <div className={`min-w-[280px] max-w-[320px] rounded-lg border-2 shadow-lg ${STATUS_STYLES[agent.status]}`}>
-      {/* Header */}
       <div className="p-3 border-b border-gray-200">
         <div className="flex items-center gap-2">
           <div className={`p-1.5 rounded-md bg-${config.color}-100`}>
@@ -126,14 +119,12 @@ function SafetyAgentNodeComponent({ data }: SafetyAgentNodeProps) {
         </div>
       </div>
 
-      {/* Description */}
       {agent.description && (
         <div className="px-3 py-2 bg-blue-50 border-b border-blue-100">
           <p className="text-xs text-blue-700">{agent.description}</p>
         </div>
       )}
 
-      {/* Tool Calls */}
       {agent.toolCalls.length > 0 && (
         <div className="p-3">
           <div className="text-xs text-gray-500 mb-1">
@@ -150,14 +141,12 @@ function SafetyAgentNodeComponent({ data }: SafetyAgentNodeProps) {
         </div>
       )}
 
-      {/* Error */}
       {agent.error && (
         <div className="px-3 py-2 bg-red-50 border-t border-red-100">
           <p className="text-xs text-red-600">{agent.error}</p>
         </div>
       )}
 
-      {/* Handles */}
       <Handle
         type="target"
         position={Position.Left}

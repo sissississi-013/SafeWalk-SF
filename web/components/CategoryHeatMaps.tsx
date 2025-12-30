@@ -1,7 +1,3 @@
-/**
- * Category Heat Maps - Shows expandable heat maps for each incident category.
- */
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -33,7 +29,6 @@ interface CategoryHeatMapsProps {
   incidentBreakdown?: Record<string, number>;
 }
 
-// Icon mapping for categories
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   'Assault': AlertTriangle,
   'Robbery': Shield,
@@ -51,7 +46,6 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>
   'default': MapPin,
 };
 
-// Color mapping for categories
 const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   'Assault': { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
   'Robbery': { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700' },
@@ -72,11 +66,9 @@ const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string
 export function CategoryHeatMaps({ coordinates, data }: CategoryHeatMapsProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  // Group coordinates by category - extract from BOTH coordinates and data
   const categorizedData = useMemo(() => {
     const categories: Record<string, { coordinates: Coordinate[]; count: number }> = {};
 
-    // First, add all coordinates that have category info
     coordinates.forEach(coord => {
       const category = coord.category || 'Other';
       if (coord.latitude && coord.longitude) {
@@ -92,15 +84,12 @@ export function CategoryHeatMaps({ coordinates, data }: CategoryHeatMapsProps) {
       }
     });
 
-    // Also extract from data records (they have more details)
     data.forEach(record => {
-      // Get category from various possible fields
       const category = record.incident_category
         || record.collision_severity
         || record.service_subtype
         || 'Other';
 
-      // Get coordinates from various possible field names
       const lat = record.latitude ?? record.lat;
       const lng = record.longitude ?? record.long ?? record.lng;
 
@@ -108,13 +97,11 @@ export function CategoryHeatMaps({ coordinates, data }: CategoryHeatMapsProps) {
         const latNum = Number(lat);
         const lngNum = Number(lng);
 
-        // Validate coordinates are in SF area (roughly)
         if (latNum >= 37.6 && latNum <= 37.9 && lngNum >= -122.6 && lngNum <= -122.3) {
           if (!categories[category]) {
             categories[category] = { coordinates: [], count: 0 };
           }
 
-          // Check if this coordinate already exists (avoid duplicates)
           const exists = categories[category].coordinates.some(
             c => Math.abs(c.latitude - latNum) < 0.0001 && Math.abs(c.longitude - lngNum) < 0.0001
           );
@@ -164,7 +151,6 @@ export function CategoryHeatMaps({ coordinates, data }: CategoryHeatMapsProps) {
         Click on a category to view its heat map distribution
       </p>
 
-      {/* Category Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {sortedCategories.slice(0, 9).map(([category, { count, coordinates: catCoords }]) => {
           const colors = CATEGORY_COLORS[category] || CATEGORY_COLORS.default;
@@ -203,11 +189,9 @@ export function CategoryHeatMaps({ coordinates, data }: CategoryHeatMapsProps) {
         </p>
       )}
 
-      {/* Modal Dialog for Heat Map */}
       {selectedCategory && selectedData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
-            {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 {(() => {
@@ -236,7 +220,6 @@ export function CategoryHeatMaps({ coordinates, data }: CategoryHeatMapsProps) {
               </button>
             </div>
 
-            {/* Map Content */}
             <div className="p-4">
               {selectedData.coordinates.length > 0 ? (
                 <SafetyMap
@@ -258,7 +241,6 @@ export function CategoryHeatMaps({ coordinates, data }: CategoryHeatMapsProps) {
               )}
             </div>
 
-            {/* Footer */}
             <div className="p-4 bg-gray-50 border-t border-gray-200">
               <div className="flex justify-between items-center text-sm text-gray-500">
                 <span>

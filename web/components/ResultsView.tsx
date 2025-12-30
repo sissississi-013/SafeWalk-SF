@@ -1,7 +1,3 @@
-/**
- * Results view displaying safety analysis, map, and incident grid.
- */
-
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
@@ -14,7 +10,6 @@ import {
   ChevronDown, Snowflake, MessageSquare
 } from 'lucide-react';
 
-// Dynamic imports for map components (client-side only)
 const SafetyMap = dynamic(() => import('./SafetyMap').then(mod => ({ default: mod.SafetyMap })), {
   ssr: false,
   loading: () => (
@@ -33,7 +28,6 @@ const CategoryHeatMaps = dynamic(() => import('./CategoryHeatMaps').then(mod => 
   ),
 });
 
-// Copy button component
 function CopyButton({ text, className = '' }: { text: string; className?: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -62,7 +56,6 @@ function CopyButton({ text, className = '' }: { text: string; className?: string
   );
 }
 
-// Download button component
 function DownloadButton({ content, filename, className = '' }: { content: string; filename: string; className?: string }) {
   const handleDownload = () => {
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
@@ -87,24 +80,18 @@ function DownloadButton({ content, filename, className = '' }: { content: string
   );
 }
 
-// Convert records to CSV and download
 function downloadRecordsAsCSV(records: Record<string, unknown>[]) {
   if (!records || records.length === 0) return;
 
-  // Get all unique keys from all records
   const allKeys = new Set<string>();
   records.forEach(record => {
     Object.keys(record).forEach(key => allKeys.add(key));
   });
   const headers = Array.from(allKeys);
 
-  // Create CSV content
   const csvRows: string[] = [];
-
-  // Add header row
   csvRows.push(headers.map(h => `"${h}"`).join(','));
 
-  // Add data rows
   records.forEach(record => {
     const row = headers.map(header => {
       const value = record[header];
@@ -117,7 +104,6 @@ function downloadRecordsAsCSV(records: Record<string, unknown>[]) {
 
   const csvContent = csvRows.join('\n');
 
-  // Create and download file
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -129,19 +115,16 @@ function downloadRecordsAsCSV(records: Record<string, unknown>[]) {
   URL.revokeObjectURL(url);
 }
 
-// Records Panel with Lazy Loading - Shows ALL columns dynamically
 function RecordsPanel({ data }: { data: Record<string, unknown>[] }) {
   const [displayedCount, setDisplayedCount] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Extract all unique column names from all records
   const columns = useMemo(() => {
     const columnSet = new Set<string>();
     data.forEach(record => {
       Object.keys(record).forEach(key => columnSet.add(key));
     });
-    // Sort columns - put common important ones first
     const priorityColumns = [
       'incident_category', 'collision_severity', 'service_subtype',
       'analysis_neighborhood', 'intersection_street_1', 'intersection_street_2',
@@ -159,21 +142,18 @@ function RecordsPanel({ data }: { data: Record<string, unknown>[] }) {
     return sortedColumns;
   }, [data]);
 
-  // Format column header for display
   const formatColumnHeader = (col: string) => {
     return col
       .replace(/_/g, ' ')
       .replace(/\b\w/g, c => c.toUpperCase());
   };
 
-  // Format cell value for display
   const formatCellValue = (value: unknown): string => {
     if (value === null || value === undefined) return '-';
     if (typeof value === 'object') {
       return JSON.stringify(value);
     }
     if (typeof value === 'number') {
-      // Format coordinates with more precision
       if (Math.abs(value) < 180 && Math.abs(value) > 30) {
         return value.toFixed(6);
       }
@@ -268,8 +248,6 @@ function RecordsPanel({ data }: { data: Record<string, unknown>[] }) {
   );
 }
 
-// Snow Leopard Retrieve Data Panel with List/Card view
-
 interface SQLQuery {
   query: string;
   sql: string;
@@ -277,15 +255,12 @@ interface SQLQuery {
   rows?: Record<string, unknown>[];
 }
 
-// Mini data table for showing query results
 function QueryResultTable({ rows, maxRows = 10 }: { rows: Record<string, unknown>[]; maxRows?: number }) {
   if (!rows || rows.length === 0) return null;
 
-  // Get columns from first row
   const columns = Object.keys(rows[0]);
   const displayRows = rows.slice(0, maxRows);
 
-  // Format cell value
   const formatValue = (value: unknown): string => {
     if (value === null || value === undefined) return '-';
     if (typeof value === 'object') return JSON.stringify(value);
@@ -296,7 +271,6 @@ function QueryResultTable({ rows, maxRows = 10 }: { rows: Record<string, unknown
     return String(value);
   };
 
-  // Format column name
   const formatColumn = (col: string) => col.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
   return (
@@ -334,7 +308,6 @@ function QueryResultTable({ rows, maxRows = 10 }: { rows: Record<string, unknown
   );
 }
 
-// Download query data as CSV
 function downloadQueryAsCSV(query: SQLQuery, index: number) {
   if (!query.rows || query.rows.length === 0) return;
 
@@ -368,7 +341,6 @@ function SnowLeopardPanel({ sql, sqlQueries }: { sql?: string; sqlQueries?: SQLQ
   const [currentIndex, setCurrentIndex] = useState(0);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
-  // Build queries array from available data
   const queries: SQLQuery[] = sqlQueries?.length
     ? sqlQueries
     : sql
@@ -381,7 +353,6 @@ function SnowLeopardPanel({ sql, sqlQueries }: { sql?: string; sqlQueries?: SQLQ
 
   return (
     <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-      {/* Header with title and view toggle */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-gray-800 flex items-center gap-2">
           <Snowflake className="w-5 h-5 text-blue-500" />
@@ -389,7 +360,6 @@ function SnowLeopardPanel({ sql, sqlQueries }: { sql?: string; sqlQueries?: SQLQ
           <span className="text-sm font-normal text-gray-500">({queries.length} {queries.length === 1 ? 'query' : 'queries'})</span>
         </h3>
 
-        {/* Segmented control - bigger, with text + icons */}
         <div className="flex rounded-lg border border-gray-300 overflow-hidden bg-gray-100 p-0.5">
           <button
             onClick={() => setViewMode('list')}
@@ -420,7 +390,6 @@ function SnowLeopardPanel({ sql, sqlQueries }: { sql?: string; sqlQueries?: SQLQ
         </div>
       </div>
 
-      {/* Card View Navigation - shown at top when in card mode */}
       {viewMode === 'card' && queries.length > 1 && (
         <div className="flex items-center justify-center gap-4 mb-4 pb-4 border-b border-gray-100">
           <button
@@ -445,17 +414,17 @@ function SnowLeopardPanel({ sql, sqlQueries }: { sql?: string; sqlQueries?: SQLQ
         </div>
       )}
 
-      {/* List View - Accordion style */}
       {viewMode === 'list' && (
-        <div className="space-y-2">
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
           {queries.map((query, idx) => {
             const isExpanded = expandedIndex === idx;
+            const isFirst = idx === 0;
+            const isLast = idx === queries.length - 1;
             return (
-              <div key={idx} className="border border-gray-200 rounded-lg overflow-hidden">
-                {/* Accordion Header */}
+              <div key={idx} className={`${!isLast ? 'border-b border-gray-200' : ''}`}>
                 <button
                   onClick={() => setExpandedIndex(isExpanded ? null : idx)}
-                  className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors text-left"
+                  className={`w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors text-left ${isFirst ? 'rounded-t-lg' : ''} ${isLast && !isExpanded ? 'rounded-b-lg' : ''}`}
                 >
                   <div className="flex-1 min-w-0 pr-4">
                     <p className="text-sm font-medium text-gray-800 truncate">
@@ -468,10 +437,8 @@ function SnowLeopardPanel({ sql, sqlQueries }: { sql?: string; sqlQueries?: SQLQ
                   <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                 </button>
 
-                {/* Accordion Content */}
                 {isExpanded && (
-                  <div className="p-4 border-t border-gray-200 space-y-4 bg-white">
-                    {/* Query Section */}
+                  <div className={`p-4 border-t border-gray-200 space-y-4 bg-white ${isLast ? 'rounded-b-lg' : ''}`}>
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Query</h4>
@@ -479,7 +446,6 @@ function SnowLeopardPanel({ sql, sqlQueries }: { sql?: string; sqlQueries?: SQLQ
                       <p className="text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg">{query.query}</p>
                     </div>
 
-                    {/* SQL Section */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Generated SQL</h4>
@@ -490,7 +456,6 @@ function SnowLeopardPanel({ sql, sqlQueries }: { sql?: string; sqlQueries?: SQLQ
                       </pre>
                     </div>
 
-                    {/* Results Section */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -520,11 +485,9 @@ function SnowLeopardPanel({ sql, sqlQueries }: { sql?: string; sqlQueries?: SQLQ
         </div>
       )}
 
-      {/* Card View - Single card with navigation */}
       {viewMode === 'card' && (
         <div className="border border-gray-200 rounded-lg overflow-hidden">
           <div className="p-4 space-y-4">
-            {/* Query Section */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Query</h4>
@@ -532,7 +495,6 @@ function SnowLeopardPanel({ sql, sqlQueries }: { sql?: string; sqlQueries?: SQLQ
               <p className="text-sm text-gray-700 bg-gray-50 px-3 py-2 rounded-lg">{currentQuery.query}</p>
             </div>
 
-            {/* SQL Section */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Generated SQL</h4>
@@ -543,7 +505,6 @@ function SnowLeopardPanel({ sql, sqlQueries }: { sql?: string; sqlQueries?: SQLQ
               </pre>
             </div>
 
-            {/* Results Section */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -575,6 +536,25 @@ function SnowLeopardPanel({ sql, sqlQueries }: { sql?: string; sqlQueries?: SQLQ
 export function ResultsView() {
   const { finalResult, flowTrace, duration, currentQuery } = useAgentStore();
 
+  const computedIncidentBreakdown = useMemo(() => {
+    if (!finalResult?.data || finalResult.data.length === 0) {
+      return finalResult?.incident_breakdown || {};
+    }
+
+    const breakdown: Record<string, number> = {};
+    finalResult.data.forEach((record: Record<string, unknown>) => {
+      const category = (
+        record.incident_category ||
+        record.collision_severity ||
+        record.service_subtype ||
+        'Other'
+      ) as string;
+      breakdown[category] = (breakdown[category] || 0) + 1;
+    });
+
+    return breakdown;
+  }, [finalResult?.data, finalResult?.incident_breakdown]);
+
   if (!finalResult) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -588,16 +568,13 @@ export function ResultsView() {
 
   const score = finalResult.safetyScore || finalResult.safety_score || 50;
 
-  // Handle analysis that might be an object
   const getAnalysisText = () => {
     const analysis = finalResult.analysis || finalResult.summary;
     if (!analysis) return undefined;
     if (typeof analysis === 'string') return analysis;
     if (typeof analysis === 'object') {
-      // If it's an object with overview, use that
       const obj = analysis as Record<string, unknown>;
       if (obj.overview) return String(obj.overview);
-      // Otherwise stringify the whole thing
       return JSON.stringify(analysis, null, 2);
     }
     return String(analysis);
@@ -606,7 +583,16 @@ export function ResultsView() {
   return (
     <div className="h-full overflow-y-auto p-6 pb-32 bg-gray-50">
       <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header Stats */}
+        {currentQuery && (
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <div className="flex items-center gap-2 text-gray-700 font-medium mb-2">
+              <MessageSquare className="w-4 h-4" />
+              Query
+            </div>
+            <p className="text-gray-800 text-lg">{currentQuery}</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white rounded-lg p-4 border border-gray-200">
             <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
@@ -637,18 +623,6 @@ export function ResultsView() {
           </div>
         </div>
 
-        {/* Query Card */}
-        {currentQuery && (
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <div className="flex items-center gap-2 text-gray-700 font-medium mb-2">
-              <MessageSquare className="w-4 h-4" />
-              Query
-            </div>
-            <p className="text-gray-800 text-lg">{currentQuery}</p>
-          </div>
-        )}
-
-        {/* Flow Trace */}
         {flowTrace.length > 0 && (
           <div className="bg-white rounded-lg p-4 border border-gray-200">
             <div className="flex items-center gap-2 text-gray-700 font-medium mb-3">
@@ -670,18 +644,15 @@ export function ResultsView() {
           </div>
         )}
 
-        {/* Safety Score Card + Map Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Safety Score Card */}
           <SafetyScoreCard
             score={score}
             rating={finalResult.rating}
             analysis={getAnalysisText()}
             recommendations={finalResult.recommendations}
-            incidentBreakdown={finalResult.incident_breakdown}
+            incidentBreakdown={computedIncidentBreakdown}
           />
 
-          {/* Interactive Map with All Incidents */}
           {finalResult.coordinates && finalResult.coordinates.length > 0 && (
             <div className="bg-white rounded-lg p-4 border border-gray-200">
               <h3 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
@@ -697,24 +668,20 @@ export function ResultsView() {
           )}
         </div>
 
-        {/* Category Heat Maps + Records Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Category Heat Maps */}
-          {(finalResult.incident_breakdown || (finalResult.data && finalResult.data.length > 0)) && (
+          {(computedIncidentBreakdown && Object.keys(computedIncidentBreakdown).length > 0 || (finalResult.data && finalResult.data.length > 0)) && (
             <CategoryHeatMaps
               coordinates={finalResult.coordinates || []}
               data={finalResult.data || []}
-              incidentBreakdown={finalResult.incident_breakdown}
+              incidentBreakdown={computedIncidentBreakdown}
             />
           )}
 
-          {/* Data Table Preview with Lazy Loading */}
           {finalResult.data && finalResult.data.length > 0 && (
             <RecordsPanel data={finalResult.data} />
           )}
         </div>
 
-        {/* Snow Leopard Retrieved Data Panel */}
         <SnowLeopardPanel sql={finalResult.sql} sqlQueries={finalResult.sqlQueries} />
       </div>
     </div>

@@ -1,14 +1,9 @@
-/**
- * Safety Map component using Leaflet with heat map overlay.
- */
-
 'use client';
 
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Fix default marker icons for Leaflet
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -30,7 +25,6 @@ interface SafetyMapProps {
   title?: string;
 }
 
-// Color mapping for incident categories
 const CATEGORY_COLORS: Record<string, string> = {
   'Assault': '#ef4444',
   'Robbery': '#f97316',
@@ -53,9 +47,7 @@ export function SafetyMap({ coordinates, height = '400px', showHeatMap = true, t
   useEffect(() => {
     if (!mapRef.current || coordinates.length === 0) return;
 
-    // Initialize map if not exists
     if (!mapInstanceRef.current) {
-      // Center on San Francisco
       const center: [number, number] = [37.7749, -122.4194];
 
       mapInstanceRef.current = L.map(mapRef.current, {
@@ -64,28 +56,23 @@ export function SafetyMap({ coordinates, height = '400px', showHeatMap = true, t
         scrollWheelZoom: true,
       });
 
-      // Add tile layer (OpenStreetMap)
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(mapInstanceRef.current);
 
-      // Create markers layer group
       markersLayerRef.current = L.layerGroup().addTo(mapInstanceRef.current);
     }
 
     const map = mapInstanceRef.current;
     const markersLayer = markersLayerRef.current!;
 
-    // Clear existing markers
     markersLayer.clearLayers();
 
-    // Remove existing heat layer
     if (heatLayerRef.current) {
       map.removeLayer(heatLayerRef.current);
       heatLayerRef.current = null;
     }
 
-    // Add markers for each coordinate
     const validCoords = coordinates.filter(
       c => c.latitude && c.longitude &&
       c.latitude >= -90 && c.latitude <= 90 &&
@@ -94,7 +81,6 @@ export function SafetyMap({ coordinates, height = '400px', showHeatMap = true, t
 
     if (validCoords.length === 0) return;
 
-    // Only add circle markers if heat map is disabled
     if (!showHeatMap) {
       validCoords.slice(0, 500).forEach(coord => {
         const color = CATEGORY_COLORS[coord.category || ''] || CATEGORY_COLORS.default;
@@ -117,11 +103,8 @@ export function SafetyMap({ coordinates, height = '400px', showHeatMap = true, t
       });
     }
 
-    // Add heat map layer if enabled
     if (showHeatMap && validCoords.length > 0) {
-      // Dynamic import for heat map (client-side only)
       import('leaflet.heat').then(() => {
-        // Check if map is still valid (not destroyed)
         if (!mapInstanceRef.current || !mapRef.current) {
           return;
         }
@@ -142,7 +125,6 @@ export function SafetyMap({ coordinates, height = '400px', showHeatMap = true, t
           },
         });
 
-        // Double-check map is still valid before adding
         if (mapInstanceRef.current) {
           heat.addTo(mapInstanceRef.current);
           heatLayerRef.current = heat;
@@ -152,7 +134,6 @@ export function SafetyMap({ coordinates, height = '400px', showHeatMap = true, t
       });
     }
 
-    // Fit bounds to show all markers
     if (validCoords.length > 0 && mapInstanceRef.current) {
       try {
         const bounds = L.latLngBounds(validCoords.map(c => [c.latitude, c.longitude]));
@@ -162,13 +143,9 @@ export function SafetyMap({ coordinates, height = '400px', showHeatMap = true, t
       }
     }
 
-    // Cleanup
-    return () => {
-      // Don't destroy the map on cleanup, just clear layers
-    };
+    return () => {};
   }, [coordinates, showHeatMap]);
 
-  // Cleanup map on unmount
   useEffect(() => {
     return () => {
       if (mapInstanceRef.current) {

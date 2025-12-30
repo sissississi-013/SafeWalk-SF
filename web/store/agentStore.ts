@@ -1,12 +1,7 @@
-/**
- * Zustand store for SafeSF agent state management.
- */
-
 import { create } from 'zustand';
 import type { Agent, ToolCall, SessionStatus, SafetyResult, Coordinate } from '@/types/agent';
 
 interface AgentStore {
-  // Session state
   sessionId: string | null;
   sessionStatus: SessionStatus;
   sessionError: string | null;
@@ -14,14 +9,11 @@ interface AgentStore {
   duration: number | null;
   currentQuery: string | null;
 
-  // Agents
   agents: Agent[];
 
-  // Final result
   finalResult: SafetyResult | null;
   flowTrace: string[];
 
-  // Actions
   setSessionStatus: (status: SessionStatus, sessionId?: string, error?: string) => void;
   setStartTime: (time: number) => void;
   setDuration: (duration: number) => void;

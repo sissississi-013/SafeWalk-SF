@@ -1,8 +1,3 @@
-/**
- * Chat input component for sending queries to SafeSF agent.
- * Includes AI-powered query suggestions using Anthropic Haiku.
- */
-
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -28,16 +23,12 @@ export function ChatInput() {
   const isRunning = sessionStatus === 'running';
   const hasContent = prompt.trim().length > 0;
 
-  // Fetch suggestions from API
   const fetchSuggestions = useCallback(async (input: string) => {
-    // Cancel any in-flight request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
 
-    // Create new abort controller for this request
     abortControllerRef.current = new AbortController();
-
     setIsLoadingSuggestions(true);
 
     try {
@@ -54,7 +45,6 @@ export function ChatInput() {
         setShowSuggestions(true);
         setSelectedIndex(-1);
       } else {
-        // On error, show fallback suggestions
         setSuggestions([
           "Is it safe near Ferry Building?",
           "Show me crime in Tenderloin",
@@ -65,12 +55,10 @@ export function ChatInput() {
         setShowSuggestions(true);
       }
     } catch (error) {
-      // Ignore abort errors (expected when cancelling)
       if (error instanceof Error && error.name === 'AbortError') {
         return;
       }
       console.error('Failed to fetch suggestions:', error);
-      // Show fallback suggestions on error
       setSuggestions([
         "Is it safe near Ferry Building?",
         "Show me crime in Tenderloin",
@@ -84,39 +72,35 @@ export function ChatInput() {
     }
   }, []);
 
-  // Debounced suggestion fetching - waits 500ms after last keystroke
   const debouncedFetchSuggestions = useCallback((input: string) => {
-    // Clear previous timeout on every keystroke
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
 
-    // Start new timeout - only fetch after 500ms of no typing
     debounceRef.current = setTimeout(() => {
       fetchSuggestions(input);
     }, 500);
   }, [fetchSuggestions]);
 
-  // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setPrompt(value);
 
-    // Fetch suggestions when typing
     if (!isRunning) {
       debouncedFetchSuggestions(value);
     }
   };
 
-  // Handle suggestion click - fills input, doesn't search
   const handleSuggestionClick = (suggestion: string) => {
     setPrompt(suggestion);
     setShowSuggestions(false);
-    setSuggestions([]);
     textareaRef.current?.focus();
   };
 
-  // Live duration tracking
+  const handleSuggestionsMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+  };
+
   const [liveDuration, setLiveDuration] = useState<number | null>(null);
 
   useEffect(() => {
@@ -130,7 +114,6 @@ export function ChatInput() {
     }
   }, [sessionStatus, startTime]);
 
-  // Auto-resize textarea
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
@@ -139,23 +122,21 @@ export function ChatInput() {
     }
   }, [prompt]);
 
-  // Load initial suggestions on focus
   const handleFocus = () => {
-    if (suggestions.length === 0 && !isRunning) {
-      fetchSuggestions(prompt);
-    } else if (suggestions.length > 0) {
+    if (suggestions.length > 0 || isLoadingSuggestions) {
       setShowSuggestions(true);
+    } else if (!isRunning) {
+      setShowSuggestions(true);
+      fetchSuggestions(prompt);
     }
   };
 
-  // Hide suggestions on blur (with delay for click handling)
   const handleBlur = () => {
     setTimeout(() => {
       setShowSuggestions(false);
     }, 200);
   };
 
-  // Close suggestions on escape
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -182,7 +163,6 @@ export function ChatInput() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Handle arrow keys for suggestion navigation
     if (showSuggestions && suggestions.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -207,7 +187,6 @@ export function ChatInput() {
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      // If suggestion is selected, use it instead
       if (showSuggestions && selectedIndex >= 0 && suggestions[selectedIndex]) {
         handleSuggestionClick(suggestions[selectedIndex]);
       } else {
@@ -216,13 +195,11 @@ export function ChatInput() {
     }
   };
 
-  // Format duration
   const formatDuration = (ms: number) => {
     const seconds = ms / 1000;
     return `${seconds.toFixed(1)}s`;
   };
 
-  // Get status text
   const getStatusText = () => {
     if (sessionStatus === 'running') {
       return liveDuration ? `Processing... ${formatDuration(liveDuration)}` : 'Processing...';
@@ -240,7 +217,6 @@ export function ChatInput() {
 
   return (
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-20">
-      {/* Status text */}
       {statusText && (
         <div className={`text-sm mb-2 ${
           sessionStatus === 'error' ? 'text-red-500' :
@@ -251,7 +227,6 @@ export function ChatInput() {
         </div>
       )}
 
-      {/* Connection status */}
       {!isConnected && (
         <div className="text-sm text-orange-500 mb-2 flex items-center gap-2">
           <Loader2 className="w-3 h-3 animate-spin" />
@@ -259,39 +234,50 @@ export function ChatInput() {
         </div>
       )}
 
-      {/* Suggestions dropdown - above input */}
-      {showSuggestions && suggestions.length > 0 && (
+      {showSuggestions && (suggestions.length > 0 || isLoadingSuggestions) && !isRunning && (
         <div
           ref={suggestionsRef}
+          onMouseDown={handleSuggestionsMouseDown}
           className="mb-2 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden"
         >
           <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-orange-500" />
-            <span className="text-xs font-medium text-gray-600">Suggestions</span>
-            {isLoadingSuggestions && (
-              <Loader2 className="w-3 h-3 animate-spin text-gray-400 ml-auto" />
-            )}
+            <span className={`text-xs font-medium ${isLoadingSuggestions ? 'bg-gradient-to-r from-orange-500 via-orange-300 to-orange-500 bg-clip-text text-transparent animate-shimmer bg-[length:200%_100%]' : 'text-gray-600'}`}>
+              Suggestions
+            </span>
           </div>
           <div className="max-h-[280px] overflow-y-auto">
-            {suggestions.map((suggestion, index) => (
-              <button
-                key={index}
-                onClick={() => handleSuggestionClick(suggestion)}
-                onMouseEnter={() => setSelectedIndex(index)}
-                className={`w-full text-left px-4 py-2.5 text-sm transition-colors cursor-pointer ${
-                  index === selectedIndex
-                    ? 'bg-orange-50 text-orange-700'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                {suggestion}
-              </button>
-            ))}
+            {isLoadingSuggestions && suggestions.length === 0 ? (
+              <div className="space-y-0">
+                {[85, 72, 90, 78].map((width, index) => (
+                  <div key={index} className="px-4 py-2.5">
+                    <div
+                      className="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"
+                      style={{ width: `${width}%` }}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              suggestions.map((suggestion, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  className={`w-full text-left px-4 py-2.5 text-sm transition-colors cursor-pointer ${
+                    index === selectedIndex
+                      ? 'bg-orange-50 text-orange-700'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {suggestion}
+                </button>
+              ))
+            )}
           </div>
         </div>
       )}
 
-      {/* Input container */}
       <div className="flex items-start gap-3 bg-white shadow-lg p-3 border border-gray-200 rounded-xl">
         <textarea
           ref={textareaRef}
@@ -307,7 +293,6 @@ export function ChatInput() {
           style={{ maxHeight: '200px', overflowY: 'auto' }}
         />
 
-        {/* Send button */}
         <button
           onClick={handleSubmit}
           disabled={!isConnected || isRunning || !hasContent}
@@ -331,7 +316,6 @@ export function ChatInput() {
         </button>
       </div>
 
-      {/* Hint */}
       <div className="mt-2 text-xs text-gray-400 text-center">
         Press Enter to send, Shift+Enter for new line
       </div>

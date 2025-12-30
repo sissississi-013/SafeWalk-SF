@@ -1,8 +1,3 @@
-/**
- * API route for query suggestions using Anthropic Haiku.
- * Returns 3-8 relevant query suggestions based on user input.
- */
-
 import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
 import { NextRequest, NextResponse } from 'next/server';
@@ -86,24 +81,19 @@ export async function POST(request: NextRequest) {
       prompt: userPrompt,
     });
 
-    // Parse the JSON response
     let suggestions: string[] = [];
     try {
-      // Clean up the response - remove any markdown or extra text
       const cleanedText = text.trim().replace(/```json\n?/g, '').replace(/```\n?/g, '');
       suggestions = JSON.parse(cleanedText);
 
-      // Validate it's an array of strings
       if (!Array.isArray(suggestions)) {
         throw new Error('Response is not an array');
       }
 
-      // Filter to only strings and limit to 8
       suggestions = suggestions
         .filter((s): s is string => typeof s === 'string')
         .slice(0, 8);
 
-      // Ensure minimum of 3 suggestions
       if (suggestions.length < 3) {
         suggestions = [
           "Is it safe near Ferry Building?",
@@ -114,7 +104,6 @@ export async function POST(request: NextRequest) {
       }
     } catch (parseError) {
       console.error('[Suggestions] Failed to parse response:', text);
-      // Return default suggestions if parsing fails
       suggestions = [
         "Is it safe near Ferry Building?",
         "Show me crime in Tenderloin",
