@@ -3,14 +3,13 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
-from typing import Optional
+from typing import Set
 
 import websockets
 from websockets.server import WebSocketServerProtocol
 
 from safesf_agent.config import WEBSOCKET_HOST, WEBSOCKET_PORT, validate_config
-from safesf_agent.agent import SafeSFAgent
+from safesf_agent.agent import process_request_with_events
 from safesf_agent.utils.event_emitter import EventEmitter
 
 logger = logging.getLogger(__name__)
@@ -29,7 +28,7 @@ class SafeSFWebSocketServer:
         """
         self.host = host
         self.port = port
-        self.clients: set[WebSocketServerProtocol] = set()
+        self.clients: Set[WebSocketServerProtocol] = set()
         logger.info(f"[WebSocketServer] Initialized for {host}:{port}")
 
     async def handle_client(self, websocket: WebSocketServerProtocol):
@@ -98,10 +97,12 @@ class SafeSFWebSocketServer:
         # Create event emitter connected to this websocket
         event_emitter = EventEmitter(websocket=websocket)
 
-        # Process the request
+        # Process the request with event streaming
         try:
-            agent = SafeSFAgent(event_emitter=event_emitter)
-            result = await agent.process_request(user_query)
+            result = await process_request_with_events(
+                {"query": user_query},
+                event_emitter
+            )
 
             # Send final result
             await websocket.send(json.dumps({

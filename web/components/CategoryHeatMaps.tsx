@@ -5,7 +5,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { X, MapPin, ChevronDown, AlertTriangle, Shield, Flame } from 'lucide-react';
+import { X, MapPin, ChevronDown, AlertTriangle, Shield, Flame, Car, Home, Users } from 'lucide-react';
 import { SafetyMap } from './SafetyMap';
 
 interface Coordinate {
@@ -16,9 +16,14 @@ interface Coordinate {
 
 interface DataRecord {
   incident_category?: string;
+  collision_severity?: string;
+  service_subtype?: string;
   analysis_neighborhood?: string;
   latitude?: number;
   longitude?: number;
+  lat?: number;
+  long?: number;
+  lng?: number;
   [key: string]: unknown;
 }
 
@@ -29,88 +34,124 @@ interface CategoryHeatMapsProps {
 }
 
 // Icon mapping for categories
-const CATEGORY_ICONS: Record<string, typeof AlertTriangle> = {
+const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   'Assault': AlertTriangle,
   'Robbery': Shield,
-  'Burglary': Shield,
-  'Theft': Shield,
-  'Vehicle Theft': Shield,
-  'Drug/Narcotic': Flame,
-  'Weapons': AlertTriangle,
+  'Burglary': Home,
+  'Motor Vehicle Theft': Car,
+  'Homicide': AlertTriangle,
+  'Rape': AlertTriangle,
+  'Weapons Carrying Etc': Shield,
+  'Weapons Offense': Shield,
+  'Encampment Reports': Users,
+  'Injury (Severe)': Car,
+  'Injury (Other Visible)': Car,
+  'Injury (Complaint of Pain)': Car,
+  'Fatal': AlertTriangle,
+  'default': MapPin,
 };
 
 // Color mapping for categories
 const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   'Assault': { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
   'Robbery': { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700' },
+  'Homicide': { bg: 'bg-red-100', border: 'border-red-300', text: 'text-red-800' },
+  'Rape': { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-700' },
   'Burglary': { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700' },
-  'Theft': { bg: 'bg-lime-50', border: 'border-lime-200', text: 'text-lime-700' },
-  'Vehicle Theft': { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' },
-  'Vandalism': { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700' },
-  'Drug/Narcotic': { bg: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-700' },
-  'Fraud': { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
-  'Weapons': { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
+  'Motor Vehicle Theft': { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
+  'Weapons Carrying Etc': { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
+  'Weapons Offense': { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
+  'Encampment Reports': { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
+  'Injury (Severe)': { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700' },
+  'Injury (Other Visible)': { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700' },
+  'Injury (Complaint of Pain)': { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700' },
+  'Fatal': { bg: 'bg-red-100', border: 'border-red-300', text: 'text-red-800' },
   'default': { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700' },
 };
 
-export function CategoryHeatMaps({ coordinates, data, incidentBreakdown }: CategoryHeatMapsProps) {
+export function CategoryHeatMaps({ coordinates, data }: CategoryHeatMapsProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  // Group coordinates by category
+  // Group coordinates by category - extract from BOTH coordinates and data
   const categorizedData = useMemo(() => {
     const categories: Record<string, { coordinates: Coordinate[]; count: number }> = {};
 
-    // Use incident breakdown if available
-    if (incidentBreakdown) {
-      Object.entries(incidentBreakdown).forEach(([category, count]) => {
-        categories[category] = { coordinates: [], count };
-      });
-    }
-
-    // Add coordinates from data records
-    data.forEach(record => {
-      const category = record.incident_category || 'Other';
-      const lat = record.latitude || (record as Record<string, number>).lat;
-      const lng = record.longitude || (record as Record<string, number>).lng;
-
-      if (lat && lng) {
+    // First, add all coordinates that have category info
+    coordinates.forEach(coord => {
+      const category = coord.category || 'Other';
+      if (coord.latitude && coord.longitude) {
         if (!categories[category]) {
           categories[category] = { coordinates: [], count: 0 };
         }
         categories[category].coordinates.push({
-          latitude: Number(lat),
-          longitude: Number(lng),
+          latitude: coord.latitude,
+          longitude: coord.longitude,
           category,
         });
-        if (!incidentBreakdown) {
-          categories[category].count++;
-        }
+        categories[category].count++;
       }
     });
 
-    // Also add coordinates that have category info
-    coordinates.forEach(coord => {
-      if (coord.category) {
-        if (!categories[coord.category]) {
-          categories[coord.category] = { coordinates: [], count: 0 };
+    // Also extract from data records (they have more details)
+    data.forEach(record => {
+      // Get category from various possible fields
+      const category = record.incident_category
+        || record.collision_severity
+        || record.service_subtype
+        || 'Other';
+
+      // Get coordinates from various possible field names
+      const lat = record.latitude ?? record.lat;
+      const lng = record.longitude ?? record.long ?? record.lng;
+
+      if (lat !== undefined && lng !== undefined && lat !== null && lng !== null) {
+        const latNum = Number(lat);
+        const lngNum = Number(lng);
+
+        // Validate coordinates are in SF area (roughly)
+        if (latNum >= 37.6 && latNum <= 37.9 && lngNum >= -122.6 && lngNum <= -122.3) {
+          if (!categories[category]) {
+            categories[category] = { coordinates: [], count: 0 };
+          }
+
+          // Check if this coordinate already exists (avoid duplicates)
+          const exists = categories[category].coordinates.some(
+            c => Math.abs(c.latitude - latNum) < 0.0001 && Math.abs(c.longitude - lngNum) < 0.0001
+          );
+
+          if (!exists) {
+            categories[category].coordinates.push({
+              latitude: latNum,
+              longitude: lngNum,
+              category,
+            });
+            categories[category].count++;
+          }
         }
-        categories[coord.category].coordinates.push(coord);
       }
     });
 
     return categories;
-  }, [coordinates, data, incidentBreakdown]);
+  }, [coordinates, data]);
 
   const sortedCategories = useMemo(() => {
     return Object.entries(categorizedData)
       .sort((a, b) => b[1].count - a[1].count)
-      .filter(([, data]) => data.count > 0);
+      .filter(([, catData]) => catData.count > 0);
   }, [categorizedData]);
 
   const selectedData = selectedCategory ? categorizedData[selectedCategory] : null;
 
   if (sortedCategories.length === 0) {
-    return null;
+    return (
+      <div className="bg-white rounded-lg p-4 border border-gray-200">
+        <h3 className="font-medium text-gray-800 mb-4 flex items-center gap-2">
+          <Flame className="w-4 h-4" />
+          Incident Heat Maps by Category
+        </h3>
+        <p className="text-sm text-gray-500">No categorized data available</p>
+      </div>
+    );
   }
 
   return (
@@ -124,10 +165,10 @@ export function CategoryHeatMaps({ coordinates, data, incidentBreakdown }: Categ
       </p>
 
       {/* Category Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        {sortedCategories.map(([category, { count }]) => {
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {sortedCategories.slice(0, 9).map(([category, { count, coordinates: catCoords }]) => {
           const colors = CATEGORY_COLORS[category] || CATEGORY_COLORS.default;
-          const Icon = CATEGORY_ICONS[category] || MapPin;
+          const Icon = CATEGORY_ICONS[category] || CATEGORY_ICONS.default;
 
           return (
             <button
@@ -147,11 +188,20 @@ export function CategoryHeatMaps({ coordinates, data, incidentBreakdown }: Categ
               <span className="text-xs text-gray-500 mt-1">
                 {count.toLocaleString()} incidents
               </span>
+              <span className="text-xs text-gray-400">
+                {catCoords.length} mapped
+              </span>
               <ChevronDown className="w-3 h-3 mt-1 text-gray-400" />
             </button>
           );
         })}
       </div>
+
+      {sortedCategories.length > 9 && (
+        <p className="text-xs text-gray-400 mt-2 text-center">
+          +{sortedCategories.length - 9} more categories
+        </p>
+      )}
 
       {/* Modal Dialog for Heat Map */}
       {selectedCategory && selectedData && (
@@ -161,7 +211,7 @@ export function CategoryHeatMaps({ coordinates, data, incidentBreakdown }: Categ
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 {(() => {
-                  const Icon = CATEGORY_ICONS[selectedCategory] || MapPin;
+                  const Icon = CATEGORY_ICONS[selectedCategory] || CATEGORY_ICONS.default;
                   const colors = CATEGORY_COLORS[selectedCategory] || CATEGORY_COLORS.default;
                   return (
                     <>
@@ -171,7 +221,7 @@ export function CategoryHeatMaps({ coordinates, data, incidentBreakdown }: Categ
                       <div>
                         <h3 className="font-semibold text-gray-800">{selectedCategory}</h3>
                         <p className="text-sm text-gray-500">
-                          {selectedData.count.toLocaleString()} incidents
+                          {selectedData.count.toLocaleString()} incidents, {selectedData.coordinates.length} mapped
                         </p>
                       </div>
                     </>

@@ -1,11 +1,13 @@
-"""Snow Leopard API tools for SafeSF database queries."""
+"""Snow Leopard API tools for SafeSF database queries using Claude Agent SDK."""
 
 import logging
 import os
 import json
+import asyncio
 from typing import Any
 
 from snowleopard import SnowLeopardPlaygroundClient
+from claude_agent_sdk import tool
 
 logger = logging.getLogger(__name__)
 
@@ -89,111 +91,112 @@ async def retrieve_data(user_query: str) -> dict[str, Any]:
         }
 
 
-async def get_response(user_query: str) -> dict[str, Any]:
-    """
-    Query SafeSF database via Snow Leopard response endpoint.
+# ============================================================================
+# SDK Tool Wrapper using @tool decorator
+# ============================================================================
 
-    Args:
-        user_query: Natural language query for safety data
-
-    Returns:
-        Dict with keys: success, response, message/error
-    """
-    try:
-        client = get_client()
-        datafile_id = os.getenv("SNOWLEOPARD_DATAFILE_ID")
-
-        if not datafile_id:
-            raise ValueError("SNOWLEOPARD_DATAFILE_ID not set")
-
-        logger.info(f"[Snow Leopard] Response query: {user_query[:100]}...")
-
-        # Call Snow Leopard API response endpoint
-        result = client.response(datafile_id=datafile_id, user_query=user_query)
-
-        response_status = getattr(result, "responseStatus", "")
-        response_text = getattr(result, "response", "")
-
-        logger.info(f"[Snow Leopard] Got response: {response_text[:100]}...")
-
-        return {
-            "success": True,
-            "response": response_text,
-            "response_status": response_status,
-        }
-
-    except Exception as e:
-        logger.error(f"[Snow Leopard] Response failed: {str(e)}")
-        return {
-            "success": False,
-            "error": str(e),
-            "response": "",
-        }
-
-
-# Tool definitions for MCP server
-def snowleopard_retrieve_tool_handler(user_query: str) -> str:
-    """Handler for retrieve tool - returns JSON string."""
-    import asyncio
-
-    result = asyncio.get_event_loop().run_until_complete(retrieve_data(user_query))
-    return json.dumps(result, default=str)
-
-
-def snowleopard_response_tool_handler(user_query: str) -> str:
-    """Handler for response tool - returns JSON string."""
-    import asyncio
-
-    result = asyncio.get_event_loop().run_until_complete(get_response(user_query))
-    return json.dumps(result, default=str)
-
-
-# Tool definitions for SDK
-snowleopard_retrieve_tool = {
-    "name": "retrieve",
-    "description": """Query SafeSF database with natural language and get raw data rows.
+RETRIEVE_DESCRIPTION = """Query SafeSF database with natural language and get raw data rows with coordinates.
 
 AVAILABLE TABLES:
-- violent_crimes: Homicide, Assault, Robbery, Rape, Weapons (columns: latitude, longitude, incident_datetime, incident_category, analysis_neighborhood, police_district)
-- property_crimes: Burglary, Motor Vehicle Theft (columns: latitude, longitude, incident_datetime, incident_category, analysis_neighborhood)
-- encampments: 311 reports (columns: latitude, longitude, requested_datetime, address, analysis_neighborhood, status_description)
-- traffic_injuries: Crash injuries (columns: latitude, longitude, collision_datetime, collision_severity, type_of_collision, number_injured)
-- traffic_fatalities: Traffic deaths (columns: latitude, longitude, collision_datetime, collision_type, deceased_type, age)
-- fire_incidents: Fires with casualties (columns: latitude, longitude, alarm_datetime, primary_situation, civilian_fatalities)
+- violent_crimes: Homicide, Assault, Robbery, Rape, Weapons
+  Columns: latitude, longitude, incident_datetime, incident_category, analysis_neighborhood, police_district
+
+- property_crimes: Burglary, Motor Vehicle Theft, Larceny Theft
+  Columns: latitude, longitude, incident_datetime, incident_category, analysis_neighborhood
+
+- encampments: 311 homeless encampment reports
+  Columns: latitude, longitude, requested_datetime, address, analysis_neighborhood, status_description
+
+- traffic_injuries: Vehicle collision injuries
+  Columns: latitude, longitude, collision_datetime, collision_severity, type_of_collision, number_injured
+
+- traffic_fatalities: Traffic deaths
+  Columns: latitude, longitude, collision_datetime, collision_type, deceased_type, age
+
+- fire_incidents: Fires with casualties
+  Columns: latitude, longitude, alarm_datetime, primary_situation, civilian_fatalities
+
 - neighborhoods: SF neighborhood names and police districts
 - incident_categories: Severity weights (0-100) for safety scoring
 
-For proximity queries, include coordinates and distance (e.g., "within 1km of latitude 37.78, longitude -122.40").
+QUERY TIPS:
+- For proximity queries: "within 1km of latitude 37.78, longitude -122.40"
+- For neighborhood queries: "crimes in Mission district"
+- For time filters: "incidents in the last 30 days"
+- For category filters: "robbery and assault incidents"
 
-Returns: SQL query executed + data rows with coordinates.""",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "user_query": {
-                "type": "string",
-                "description": "Natural language query for safety data",
+Returns: SQL query executed + data rows with latitude/longitude coordinates."""
+
+
+@tool("retrieve", RETRIEVE_DESCRIPTION, {"query": str})
+async def retrieve_tool(args: dict) -> dict:
+    """
+    Query SafeSF database and get raw data rows.
+
+    Args:
+        args: Dictionary with 'query' key containing the natural language query
+
+    Returns:
+        MCP-formatted response with data or error
+    """
+    try:
+        query = args.get("query", "")
+        result = await retrieve_data(query)
+
+        if result.get("success"):
+            all_rows = result.get("rows", [])
+            row_count = len(all_rows)
+
+            # Extract coordinates with category for mapping
+            coordinates = []
+            for row in all_rows:
+                if isinstance(row, dict):
+                    lat = row.get("latitude") or row.get("lat")
+                    lng = row.get("longitude") or row.get("long") or row.get("lng")
+                    if lat and lng:
+                        # Get category from various possible fields
+                        category = (
+                            row.get("incident_category")
+                            or row.get("collision_severity")
+                            or row.get("service_subtype")
+                            or "Other"
+                        )
+                        coordinates.append({
+                            "latitude": lat,
+                            "longitude": lng,
+                            "category": category
+                        })
+
+            # Format successful response - return ALL data
+            response_data = {
+                "success": True,
+                "row_count": row_count,
+                "sql": result.get("sql", ""),
+                "rows": all_rows,  # Return ALL rows
+                "coordinates": coordinates,  # Return ALL coordinates with category
+                "total_rows": row_count,
             }
-        },
-        "required": ["user_query"],
-    },
-    "handler": snowleopard_retrieve_tool_handler,
-}
 
-snowleopard_response_tool = {
-    "name": "response",
-    "description": """Query SafeSF database and get a natural language summary.
+            logger.info(f"[retrieve_tool] Returning {row_count} rows, {len(coordinates)} coordinates")
 
-Same tables as retrieve tool, but returns human-readable summary instead of raw data rows.
-Use this when you need a quick summary rather than detailed data.""",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "user_query": {
-                "type": "string",
-                "description": "Natural language query for safety data",
+            return {
+                "content": [{"type": "text", "text": json.dumps(response_data, default=str)}]
             }
-        },
-        "required": ["user_query"],
-    },
-    "handler": snowleopard_response_tool_handler,
-}
+        else:
+            return {
+                "content": [{"type": "text", "text": json.dumps({
+                    "success": False,
+                    "error": result.get("error", "Unknown error")
+                })}],
+                "is_error": True
+            }
+
+    except Exception as e:
+        logger.error(f"[retrieve_tool] Error: {e}")
+        return {
+            "content": [{"type": "text", "text": json.dumps({
+                "success": False,
+                "error": str(e)
+            })}],
+            "is_error": True
+        }

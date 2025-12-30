@@ -5,7 +5,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, ChevronDown, ChevronRight, CheckCircle, Loader2, AlertCircle, MapPin, Database, FileText, Brain } from 'lucide-react';
+import { X, ChevronDown, ChevronRight, CheckCircle, Loader2, AlertCircle, MapPin, Database, FileText, Brain, Copy, Check } from 'lucide-react';
 import type { Agent, ToolCall } from '@/types/agent';
 
 // Agent type configuration
@@ -16,6 +16,36 @@ const AGENT_CONFIG: Record<string, { icon: React.ElementType; label: string; col
   'summary-agent': { icon: FileText, label: 'Summary Agent', color: 'orange' },
 };
 
+// Copy button component
+function CopyButton({ text, className = '' }: { text: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${className}`}
+      title="Copy to clipboard"
+    >
+      {copied ? (
+        <Check className="w-3.5 h-3.5 text-green-600" />
+      ) : (
+        <Copy className="w-3.5 h-3.5 text-gray-500" />
+      )}
+    </button>
+  );
+}
+
 interface ToolCallItemProps {
   toolCall: ToolCall;
   defaultExpanded?: boolean;
@@ -23,6 +53,23 @@ interface ToolCallItemProps {
 
 function ToolCallItem({ toolCall, defaultExpanded = false }: ToolCallItemProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  // Extract query from input if it exists
+  const queryInput = toolCall.input?.query as string | undefined;
+
+  // Format result for display
+  const formatResult = (result: unknown): string => {
+    if (result === null || result === undefined) {
+      return 'No data returned';
+    }
+    if (typeof result === 'string') {
+      return result;
+    }
+    return JSON.stringify(result, null, 2);
+  };
+
+  const resultText = formatResult(toolCall.result);
+  const hasResult = toolCall.result !== null && toolCall.result !== undefined;
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -54,25 +101,43 @@ function ToolCallItem({ toolCall, defaultExpanded = false }: ToolCallItemProps) 
 
       {isExpanded && (
         <div className="p-4 space-y-4 bg-white">
-          {/* Input */}
+          {/* Input - with copy button for query */}
           {toolCall.input && Object.keys(toolCall.input).length > 0 && (
             <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Input</h4>
-              <pre className="text-xs bg-gray-100 p-3 rounded-lg overflow-x-auto max-h-48 overflow-y-auto">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase">Input</h4>
+                {queryInput && (
+                  <CopyButton text={queryInput} />
+                )}
+              </div>
+              <pre className="text-xs bg-gray-100 p-3 rounded-lg overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-words">
                 {JSON.stringify(toolCall.input, null, 2)}
               </pre>
             </div>
           )}
 
-          {/* Result */}
-          {toolCall.result !== undefined && (
+          {/* Result - with fixed size and scroll */}
+          {hasResult && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase">Result</h4>
+                <CopyButton text={resultText} />
+              </div>
+              <pre className="text-xs bg-gray-100 p-3 rounded-lg overflow-x-auto h-64 overflow-y-auto whitespace-pre-wrap break-words">
+                {resultText}
+              </pre>
+            </div>
+          )}
+
+          {/* Show message when result is null/undefined */}
+          {!hasResult && toolCall.status === 'complete' && !toolCall.error && (
             <div>
               <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Result</h4>
-              <pre className="text-xs bg-gray-100 p-3 rounded-lg overflow-x-auto max-h-64 overflow-y-auto">
-                {typeof toolCall.result === 'string'
-                  ? String(toolCall.result)
-                  : JSON.stringify(toolCall.result, null, 2)}
-              </pre>
+              <div className="text-sm text-gray-500 bg-gray-100 p-3 rounded-lg">
+                {toolCall.rowCount !== undefined
+                  ? `Retrieved ${toolCall.rowCount} rows (data available in Results tab)`
+                  : 'No data returned'}
+              </div>
             </div>
           )}
 
@@ -187,8 +252,11 @@ export function SidePanel({ agent, onClose }: SidePanelProps) {
         {/* Agent Output */}
         {agent.output && Object.keys(agent.output).length > 0 && (
           <div className="p-4 bg-green-50 rounded-lg border border-green-100">
-            <h3 className="text-xs font-semibold text-green-600 uppercase mb-2">Output</h3>
-            <pre className="text-xs bg-white p-3 rounded-lg overflow-x-auto max-h-64 overflow-y-auto">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold text-green-600 uppercase">Output</h3>
+              <CopyButton text={JSON.stringify(agent.output, null, 2)} />
+            </div>
+            <pre className="text-xs bg-white p-3 rounded-lg overflow-x-auto h-64 overflow-y-auto whitespace-pre-wrap break-words">
               {JSON.stringify(agent.output, null, 2)}
             </pre>
           </div>

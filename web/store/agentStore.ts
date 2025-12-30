@@ -12,6 +12,7 @@ interface AgentStore {
   sessionError: string | null;
   startTime: number | null;
   duration: number | null;
+  currentQuery: string | null;
 
   // Agents
   agents: Agent[];
@@ -24,6 +25,7 @@ interface AgentStore {
   setSessionStatus: (status: SessionStatus, sessionId?: string, error?: string) => void;
   setStartTime: (time: number) => void;
   setDuration: (duration: number) => void;
+  setCurrentQuery: (query: string) => void;
   addAgent: (agent: Agent) => void;
   updateAgent: (agentId: string, updates: Partial<Agent>) => void;
   addToolCall: (agentId: string, toolCall: ToolCall) => void;
@@ -39,6 +41,7 @@ const initialState = {
   sessionError: null,
   startTime: null,
   duration: null,
+  currentQuery: null,
   agents: [],
   finalResult: null,
   flowTrace: [],
@@ -57,6 +60,8 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   setStartTime: (time) => set({ startTime: time }),
 
   setDuration: (duration) => set({ duration }),
+
+  setCurrentQuery: (query) => set({ currentQuery: query }),
 
   addAgent: (agent) =>
     set((state) => ({

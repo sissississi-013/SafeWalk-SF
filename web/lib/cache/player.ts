@@ -106,17 +106,20 @@ async function processEvent(event: CacheEvent, actions: StoreActions): Promise<v
       });
       break;
 
-    case 'agent_spawned':
+    case 'agent_spawned': {
+      const inputId = data.input_id ? String(data.input_id) : undefined;
+      console.log('[CachePlayer] Agent spawned:', data.agent_id, 'type:', data.agent_type, 'inputId:', inputId);
       actions.addAgent({
         id: data.agent_id as string,
         type: (data.agent_type as Agent['type']) || 'data-agent',
         description: data.description as string,
         status: 'running',
-        inputId: data.input_id as string,
+        inputId: inputId,
         toolCalls: [],
         startedAt: new Date().toISOString(),
       });
       break;
+    }
 
     case 'tool_called':
       if (data.agent_id) {
@@ -135,9 +138,12 @@ async function processEvent(event: CacheEvent, actions: StoreActions): Promise<v
         const agent = agents.find(a => a.id === data.agent_id);
         const runningTool = agent?.toolCalls.find(tc => tc.status === 'running');
         if (runningTool) {
+          // Capture the full result data
+          const resultData = data.tool_result || data.data || data.coordinates || null;
           actions.completeToolCall(data.agent_id as string, runningTool.id, {
             status: 'complete',
             rowCount: data.row_count as number,
+            result: resultData,
           });
         }
       }
