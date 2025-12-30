@@ -1,31 +1,15 @@
-/**
- * WebSocket hook for SafeSF agent communication.
- */
-
 'use client';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAgentStore } from '@/store/agentStore';
 import type { WebSocketMessage, Agent, ToolCall } from '@/types/agent';
-import {
-  isCacheEnabled,
-  getCache,
-  createRecorder,
-  recordEvent,
-  finalizeRecording,
-  replayCache,
-  type CacheRecorder,
-  type CacheEventType,
-} from '@/lib/cache';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8765';
 
 export function useSafeSFWebSocket() {
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
-  const recorderRef = useRef<CacheRecorder | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [isReplaying, setIsReplaying] = useState(false);
 
   const {
     setSessionStatus,
@@ -41,19 +25,8 @@ export function useSafeSFWebSocket() {
     reset,
   } = useAgentStore();
 
-  const handleEvent = useCallback((message: WebSocketMessage, shouldRecord = true) => {
+  const handleEvent = useCallback((message: WebSocketMessage) => {
     const eventType = message.type;
-
-    // Record event if we have an active recorder
-    if (shouldRecord && recorderRef.current && !recorderRef.current.isFinalized) {
-      const recordableTypes: CacheEventType[] = [
-        'session_started', 'agent_spawned', 'tool_called', 'tool_result',
-        'data_received', 'agent_complete', 'session_complete', 'session_error', 'final_result'
-      ];
-      if (recordableTypes.includes(eventType as CacheEventType)) {
-        recordEvent(recorderRef.current, eventType as CacheEventType, message as unknown as Record<string, unknown>);
-      }
-    }
 
     switch (eventType) {
       case 'session_started':
@@ -61,7 +34,6 @@ export function useSafeSFWebSocket() {
         setStartTime(Date.now());
         console.log('[WS] Session started:', message.request_id);
 
-        // Add orchestrator as root agent
         addAgent({
           id: message.request_id || 'orchestrator',
           type: 'orchestrator',
@@ -104,21 +76,19 @@ export function useSafeSFWebSocket() {
 
       case 'tool_result':
         if (message.agent_id) {
-          // Find the last running tool call for this agent
           const agents = useAgentStore.getState().agents;
           const agent = agents.find(a => a.id === message.agent_id);
           const runningTool = agent?.toolCalls.find(tc => tc.status === 'running');
           if (runningTool) {
-            // Capture the full result data from tool_result, data, or coordinates
-            const resultData = message.tool_result || message.data || message.coordinates || null;
+            const resultData = message.result || message.tool_result || message.data || message.coordinates || null;
             completeToolCall(message.agent_id, runningTool.id, {
               status: 'complete',
-              rowCount: message.row_count,
+              rowCount: message.row_count !== undefined ? message.row_count : undefined,
               result: resultData,
             });
           }
         }
-        console.log('[WS] Tool result:', message.agent_id, message.row_count);
+        console.log('[WS] Tool result:', message.agent_id, message.row_count ?? 'completed');
         break;
 
       case 'data_received':
@@ -145,7 +115,6 @@ export function useSafeSFWebSocket() {
           setFlowTrace(message.flow_trace);
         }
         if (message.final_response) {
-          // Preserve category field in coordinates
           const coords = (message.final_response.coordinates || []) as Array<{latitude: number; longitude: number; category?: string}>;
           setFinalResult({
             safetyScore: message.final_response.safety_score,
@@ -160,7 +129,6 @@ export function useSafeSFWebSocket() {
             incident_breakdown: message.final_response.incident_breakdown,
           });
         }
-        // Mark orchestrator as complete
         const agents = useAgentStore.getState().agents;
         const orchestrator = agents.find(a => a.type === 'orchestrator');
         if (orchestrator) {
@@ -168,11 +136,6 @@ export function useSafeSFWebSocket() {
             status: 'complete',
             completedAt: new Date().toISOString(),
           });
-        }
-        // Finalize recording if active
-        if (recorderRef.current && !recorderRef.current.isFinalized) {
-          finalizeRecording(recorderRef.current);
-          recorderRef.current = null;
         }
         console.log('[WS] Session complete:', message.duration_ms, 'ms');
         break;
@@ -184,7 +147,6 @@ export function useSafeSFWebSocket() {
         break;
 
       case 'final_result': {
-        // Handle final_result from SafeSF server
         setSessionStatus('complete');
         if (message.duration_ms) {
           setDuration(message.duration_ms);
@@ -192,9 +154,7 @@ export function useSafeSFWebSocket() {
         if (message.flow_trace) {
           setFlowTrace(message.flow_trace);
         }
-        // Extract data from the message itself
         const result = message as unknown as Record<string, unknown>;
-        // Preserve category field in coordinates
         const coords = (result.coordinates || []) as Array<{latitude: number; longitude: number; category?: string}>;
         setFinalResult({
           safetyScore: result.safety_score as number | undefined,
@@ -208,7 +168,6 @@ export function useSafeSFWebSocket() {
           sqlQueries: result.sqlQueries as Array<{query: string; sql: string; rowCount?: number}> | undefined,
           incident_breakdown: result.incident_breakdown as Record<string, number> | undefined,
         });
-        // Mark orchestrator as complete
         const agentsList = useAgentStore.getState().agents;
         const orch = agentsList.find(a => a.type === 'orchestrator');
         if (orch) {
@@ -216,11 +175,6 @@ export function useSafeSFWebSocket() {
             status: 'complete',
             completedAt: new Date().toISOString(),
           });
-        }
-        // Finalize recording if active
-        if (recorderRef.current && !recorderRef.current.isFinalized) {
-          finalizeRecording(recorderRef.current);
-          recorderRef.current = null;
         }
         console.log('[WS] Final result received');
         break;
@@ -232,7 +186,6 @@ export function useSafeSFWebSocket() {
         break;
 
       case 'pong':
-        // Heartbeat response
         break;
 
       default:
@@ -281,7 +234,6 @@ export function useSafeSFWebSocket() {
       console.log('[WS] Disconnected');
       setIsConnected(false);
 
-      // Reconnect after 3 seconds
       reconnectTimeout.current = setTimeout(() => {
         console.log('[WS] Attempting reconnect...');
         connect();
@@ -301,29 +253,10 @@ export function useSafeSFWebSocket() {
     }
   }, []);
 
-  const startSession = useCallback(async (query: string) => {
-    console.log('[WS] Resetting session state for new query');
+  const startSession = useCallback((query: string) => {
     reset();
     setCurrentQuery(query);
 
-    // Check cache first
-    if (isCacheEnabled()) {
-      const cached = getCache(query);
-      if (cached) {
-        console.log('[Cache] Hit! Replaying cached session...');
-        setIsReplaying(true);
-        try {
-          await replayCache(cached);
-        } finally {
-          setIsReplaying(false);
-        }
-        return;
-      }
-      console.log('[Cache] Miss. Starting live session with recording...');
-      recorderRef.current = createRecorder(query);
-    }
-
-    // No cache or cache disabled - send to WebSocket
     sendMessage({
       action: 'query',
       query,
@@ -332,7 +265,6 @@ export function useSafeSFWebSocket() {
     console.log('[WS] Starting session:', query.slice(0, 50));
   }, [sendMessage, reset, setCurrentQuery]);
 
-  // Connect on mount
   useEffect(() => {
     connect();
 
@@ -348,7 +280,6 @@ export function useSafeSFWebSocket() {
 
   return {
     isConnected,
-    isReplaying,
     startSession,
     sendMessage,
   };

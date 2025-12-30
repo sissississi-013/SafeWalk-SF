@@ -78,6 +78,7 @@ export interface WebSocketMessage {
   tool_name?: string;
   tool_input?: Record<string, unknown>;
   tool_result?: unknown;
+  result?: unknown;
   success?: boolean;
   row_count?: number;
   coordinates?: Coordinate[];

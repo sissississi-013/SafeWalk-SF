@@ -149,16 +149,22 @@ class EventEmitter:
         agent_id: str,
         tool_name: str,
         success: bool,
-        row_count: int = 0,
+        row_count: Optional[int] = None,
+        result: Optional[Any] = None,
     ):
         """Emit tool result event."""
-        await self.emit(EventType.TOOL_RESULT, {
+        event_data = {
             "agent_id": agent_id,
             "tool_name": tool_name,
             "success": success,
-            "row_count": row_count,
-            "description": f"{tool_name} returned {row_count} rows",
-        })
+            "description": f"{tool_name} completed",
+        }
+        if row_count is not None:
+            event_data["row_count"] = row_count
+            event_data["description"] = f"{tool_name} returned {row_count} rows"
+        if result is not None:
+            event_data["result"] = result
+        await self.emit(EventType.TOOL_RESULT, event_data)
 
     async def data_received(
         self,

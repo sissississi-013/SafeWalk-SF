@@ -1,14 +1,9 @@
-/**
- * Side panel for displaying agent details.
- */
-
 'use client';
 
 import { useState } from 'react';
 import { X, ChevronDown, ChevronRight, CheckCircle, Loader2, AlertCircle, MapPin, Database, FileText, Brain, Copy, Check } from 'lucide-react';
 import type { Agent, ToolCall } from '@/types/agent';
 
-// Agent type configuration
 const AGENT_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string }> = {
   'orchestrator': { icon: Brain, label: 'Orchestrator', color: 'purple' },
   'location-resolver': { icon: MapPin, label: 'Location Resolver', color: 'blue' },
@@ -16,7 +11,6 @@ const AGENT_CONFIG: Record<string, { icon: React.ElementType; label: string; col
   'summary-agent': { icon: FileText, label: 'Summary Agent', color: 'orange' },
 };
 
-// Copy button component
 function CopyButton({ text, className = '' }: { text: string; className?: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -54,10 +48,8 @@ interface ToolCallItemProps {
 function ToolCallItem({ toolCall, defaultExpanded = false }: ToolCallItemProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
-  // Extract query from input if it exists
   const queryInput = toolCall.input?.query as string | undefined;
 
-  // Format result for display
   const formatResult = (result: unknown): string => {
     if (result === null || result === undefined) {
       return 'No data returned';
@@ -70,6 +62,7 @@ function ToolCallItem({ toolCall, defaultExpanded = false }: ToolCallItemProps) 
 
   const resultText = formatResult(toolCall.result);
   const hasResult = toolCall.result !== null && toolCall.result !== undefined;
+  const isDataTool = toolCall.rowCount !== undefined;
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -101,7 +94,6 @@ function ToolCallItem({ toolCall, defaultExpanded = false }: ToolCallItemProps) 
 
       {isExpanded && (
         <div className="p-4 space-y-4 bg-white">
-          {/* Input - with copy button for query */}
           {toolCall.input && Object.keys(toolCall.input).length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -116,32 +108,36 @@ function ToolCallItem({ toolCall, defaultExpanded = false }: ToolCallItemProps) 
             </div>
           )}
 
-          {/* Result - with fixed size and scroll */}
-          {hasResult && (
+          {hasResult && !isDataTool && (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-semibold text-gray-500 uppercase">Result</h4>
                 <CopyButton text={resultText} />
               </div>
-              <pre className="text-xs bg-gray-100 p-3 rounded-lg overflow-x-auto h-64 overflow-y-auto whitespace-pre-wrap break-words">
+              <pre className="text-xs bg-gray-100 p-3 rounded-lg overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap break-words">
                 {resultText}
               </pre>
             </div>
           )}
 
-          {/* Show message when result is null/undefined */}
-          {!hasResult && toolCall.status === 'complete' && !toolCall.error && (
+          {isDataTool && toolCall.status === 'complete' && (
             <div>
               <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Result</h4>
-              <div className="text-sm text-gray-500 bg-gray-100 p-3 rounded-lg">
-                {toolCall.rowCount !== undefined
-                  ? `Retrieved ${toolCall.rowCount} rows (data available in Results tab)`
-                  : 'No data returned'}
+              <div className="text-sm text-gray-600 bg-gray-100 p-3 rounded-lg">
+                Retrieved <span className="font-semibold">{toolCall.rowCount}</span> rows (data available in Results tab)
               </div>
             </div>
           )}
 
-          {/* Error */}
+          {!hasResult && !isDataTool && toolCall.status === 'complete' && !toolCall.error && (
+            <div>
+              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Result</h4>
+              <div className="text-sm text-gray-500 bg-gray-100 p-3 rounded-lg">
+                Completed successfully
+              </div>
+            </div>
+          )}
+
           {toolCall.error && (
             <div>
               <h4 className="text-xs font-semibold text-red-500 uppercase mb-2">Error</h4>
@@ -167,7 +163,6 @@ export function SidePanel({ agent, onClose }: SidePanelProps) {
 
   return (
     <div className="absolute top-0 right-0 h-full w-[500px] bg-white shadow-xl border-l border-gray-200 flex flex-col z-50">
-      {/* Header */}
       <div className="p-4 border-b border-gray-200 flex items-center gap-3">
         <div className={`p-2 rounded-lg bg-${config.color}-100`}>
           <Icon className={`w-5 h-5 text-${config.color}-600`} />
@@ -193,9 +188,7 @@ export function SidePanel({ agent, onClose }: SidePanelProps) {
         </button>
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Description */}
         {agent.description && (
           <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
             <h3 className="text-xs font-semibold text-blue-600 uppercase mb-1">Description</h3>
@@ -203,7 +196,6 @@ export function SidePanel({ agent, onClose }: SidePanelProps) {
           </div>
         )}
 
-        {/* Input ID */}
         {agent.inputId && (
           <div>
             <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Input From</h3>
@@ -213,7 +205,6 @@ export function SidePanel({ agent, onClose }: SidePanelProps) {
           </div>
         )}
 
-        {/* Timestamps */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <h3 className="text-xs font-semibold text-gray-500 uppercase mb-1">Started</h3>
@@ -231,7 +222,6 @@ export function SidePanel({ agent, onClose }: SidePanelProps) {
           )}
         </div>
 
-        {/* Tool Calls */}
         {agent.toolCalls.length > 0 && (
           <div>
             <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">
@@ -249,7 +239,6 @@ export function SidePanel({ agent, onClose }: SidePanelProps) {
           </div>
         )}
 
-        {/* Agent Output */}
         {agent.output && Object.keys(agent.output).length > 0 && (
           <div className="p-4 bg-green-50 rounded-lg border border-green-100">
             <div className="flex items-center justify-between mb-2">
@@ -262,7 +251,6 @@ export function SidePanel({ agent, onClose }: SidePanelProps) {
           </div>
         )}
 
-        {/* Error */}
         {agent.error && (
           <div className="p-4 bg-red-50 rounded-lg border border-red-100">
             <h3 className="text-xs font-semibold text-red-600 uppercase mb-1">Error</h3>

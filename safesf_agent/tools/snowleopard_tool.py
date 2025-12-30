@@ -49,8 +49,12 @@ async def retrieve_data(user_query: str) -> dict[str, Any]:
 
         logger.info(f"[Snow Leopard] Retrieve query: {user_query[:100]}...")
 
-        # Call Snow Leopard API
-        result = client.retrieve(datafile_id=datafile_id, user_query=user_query)
+        # Call Snow Leopard API (run in executor to avoid blocking event loop)
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: client.retrieve(datafile_id=datafile_id, user_query=user_query)
+        )
 
         # Extract data from response
         response_status = getattr(result, "responseStatus", "")
