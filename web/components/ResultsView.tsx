@@ -4,10 +4,11 @@
 
 'use client';
 
+import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useAgentStore } from '@/store/agentStore';
 import { SafetyScoreCard } from './SafetyScoreCard';
-import { MapPin, Database, Clock, Route } from 'lucide-react';
+import { MapPin, Database, Clock, Route, Copy, Check, Download } from 'lucide-react';
 
 // Dynamic imports for map components (client-side only)
 const SafetyMap = dynamic(() => import('./SafetyMap').then(mod => ({ default: mod.SafetyMap })), {
@@ -27,6 +28,77 @@ const CategoryHeatMaps = dynamic(() => import('./CategoryHeatMaps').then(mod => 
     </div>
   ),
 });
+
+// Copy button component
+function CopyButton({ text, className = '' }: { text: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className={`p-1.5 rounded hover:bg-gray-200 transition-colors ${className}`}
+      title="Copy to clipboard"
+    >
+      {copied ? (
+        <Check className="w-4 h-4 text-green-600" />
+      ) : (
+        <Copy className="w-4 h-4 text-gray-500" />
+      )}
+    </button>
+  );
+}
+
+// Convert records to CSV and download
+function downloadRecordsAsCSV(records: Record<string, unknown>[]) {
+  if (!records || records.length === 0) return;
+
+  // Get all unique keys from all records
+  const allKeys = new Set<string>();
+  records.forEach(record => {
+    Object.keys(record).forEach(key => allKeys.add(key));
+  });
+  const headers = Array.from(allKeys);
+
+  // Create CSV content
+  const csvRows: string[] = [];
+
+  // Add header row
+  csvRows.push(headers.map(h => `"${h}"`).join(','));
+
+  // Add data rows
+  records.forEach(record => {
+    const row = headers.map(header => {
+      const value = record[header];
+      if (value === null || value === undefined) return '""';
+      if (typeof value === 'object') return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
+      return `"${String(value).replace(/"/g, '""')}"`;
+    });
+    csvRows.push(row.join(','));
+  });
+
+  const csvContent = csvRows.join('\n');
+
+  // Create and download file
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `safesf_records_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 export function ResultsView() {
   const { finalResult, flowTrace, duration } = useAgentStore();
@@ -60,8 +132,8 @@ export function ResultsView() {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-6 bg-gray-50">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="h-full overflow-y-auto p-6 pb-32 bg-gray-50">
+      <div className="max-w-6xl mx-auto space-y-6">
         {/* Header Stats */}
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white rounded-lg p-4 border border-gray-200">
@@ -115,80 +187,99 @@ export function ResultsView() {
           </div>
         )}
 
-        {/* Safety Score Card */}
-        <SafetyScoreCard
-          score={score}
-          rating={finalResult.rating}
-          analysis={getAnalysisText()}
-          recommendations={finalResult.recommendations}
-          incidentBreakdown={finalResult.incident_breakdown}
-        />
-
-        {/* Interactive Map with All Incidents */}
-        {finalResult.coordinates && finalResult.coordinates.length > 0 && (
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <h3 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              Incident Locations ({finalResult.coordinates.length} points)
-            </h3>
-            <SafetyMap
-              coordinates={finalResult.coordinates}
-              height="400px"
-              showHeatMap={true}
-            />
-          </div>
-        )}
-
-        {/* Category Heat Maps */}
-        {(finalResult.incident_breakdown || (finalResult.data && finalResult.data.length > 0)) && (
-          <CategoryHeatMaps
-            coordinates={finalResult.coordinates || []}
-            data={finalResult.data || []}
+        {/* Safety Score Card + Map Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Safety Score Card */}
+          <SafetyScoreCard
+            score={score}
+            rating={finalResult.rating}
+            analysis={getAnalysisText()}
+            recommendations={finalResult.recommendations}
             incidentBreakdown={finalResult.incident_breakdown}
           />
-        )}
 
-        {/* Data Table Preview */}
-        {finalResult.data && finalResult.data.length > 0 && (
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <h3 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
-              <Database className="w-4 h-4" />
-              Sample Records ({Math.min(10, finalResult.data.length)} of {finalResult.data.length})
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="px-3 py-2 text-left text-gray-600 font-medium">Category</th>
-                    <th className="px-3 py-2 text-left text-gray-600 font-medium">Neighborhood</th>
-                    <th className="px-3 py-2 text-left text-gray-600 font-medium">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {finalResult.data.slice(0, 10).map((record, index) => (
-                    <tr key={index} className="border-t border-gray-100">
-                      <td className="px-3 py-2 text-gray-800">
-                        {record.incident_category || record.collision_severity || '-'}
-                      </td>
-                      <td className="px-3 py-2 text-gray-600">
-                        {record.analysis_neighborhood || '-'}
-                      </td>
-                      <td className="px-3 py-2 text-gray-500 text-xs">
-                        {record.incident_datetime || record.collision_datetime || '-'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Interactive Map with All Incidents */}
+          {finalResult.coordinates && finalResult.coordinates.length > 0 && (
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <h3 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Incident Locations ({finalResult.coordinates.length} points)
+              </h3>
+              <SafetyMap
+                coordinates={finalResult.coordinates}
+                height="280px"
+                showHeatMap={true}
+              />
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Category Heat Maps + Records Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Category Heat Maps */}
+          {(finalResult.incident_breakdown || (finalResult.data && finalResult.data.length > 0)) && (
+            <CategoryHeatMaps
+              coordinates={finalResult.coordinates || []}
+              data={finalResult.data || []}
+              incidentBreakdown={finalResult.incident_breakdown}
+            />
+          )}
+
+          {/* Data Table Preview */}
+          {finalResult.data && finalResult.data.length > 0 && (
+            <div className="bg-white rounded-lg p-4 border border-gray-200">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-medium text-gray-800 flex items-center gap-2">
+                  <Database className="w-4 h-4" />
+                  Records ({Math.min(10, finalResult.data.length)} of {finalResult.data.length})
+                </h3>
+                <button
+                  onClick={() => downloadRecordsAsCSV(finalResult.data)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                  title="Download all records as CSV"
+                >
+                  <Download className="w-4 h-4" />
+                  Download CSV
+                </button>
+              </div>
+              <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-gray-600 font-medium">Category</th>
+                      <th className="px-3 py-2 text-left text-gray-600 font-medium">Neighborhood</th>
+                      <th className="px-3 py-2 text-left text-gray-600 font-medium">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {finalResult.data.slice(0, 10).map((record, index) => (
+                      <tr key={index} className="border-t border-gray-100">
+                        <td className="px-3 py-2 text-gray-800">
+                          {record.incident_category || record.collision_severity || '-'}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">
+                          {record.analysis_neighborhood || '-'}
+                        </td>
+                        <td className="px-3 py-2 text-gray-500 text-xs">
+                          {record.incident_datetime || record.collision_datetime || '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* SQL Query */}
         {finalResult.sql && (
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
-            <h3 className="font-medium text-gray-800 mb-3">Generated SQL</h3>
-            <pre className="text-xs bg-gray-100 p-3 rounded-lg overflow-x-auto">
+          <div className="bg-white rounded-lg p-4 border border-gray-200 mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium text-gray-800">Generated SQL</h3>
+              <CopyButton text={finalResult.sql} />
+            </div>
+            <pre className="text-xs bg-gray-100 p-3 rounded-lg overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-words font-mono">
               {finalResult.sql}
             </pre>
           </div>

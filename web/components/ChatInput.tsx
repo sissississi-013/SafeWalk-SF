@@ -105,7 +105,7 @@ export function ChatInput() {
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask about safety in San Francisco... (e.g., 'Is it safe near Ferry Building?')"
+          placeholder="Is it safe near Ferry Building?"
           disabled={!isConnected || isRunning}
           rows={1}
           className="flex-1 resize-none outline-none text-gray-800 placeholder:text-gray-400 disabled:bg-transparent disabled:text-gray-400 py-2 px-1 min-h-[40px]"

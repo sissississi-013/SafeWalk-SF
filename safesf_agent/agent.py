@@ -375,7 +375,11 @@ If you cannot resolve the location, return:
             }
 
             self.flow_tracker.complete_agent(flow_id, output)
-            await self.event_emitter.agent_complete(flow_id, "completed", {"row_count": len(rows)})
+            await self.event_emitter.agent_complete(flow_id, "completed", {
+                "row_count": len(rows),
+                "sql": sql,
+                "coordinate_count": len(coordinates),
+            })
 
             return output
 
@@ -450,7 +454,13 @@ Provide your analysis as a JSON object with:
             self.flow_tracker.complete_agent(flow_id, result)
             await self.event_emitter.agent_complete(
                 flow_id, "completed",
-                {"safety_score": result.get("safety_score")}
+                {
+                    "safety_score": result.get("safety_score"),
+                    "rating": result.get("rating"),
+                    "analysis": result.get("analysis"),
+                    "recommendations": result.get("recommendations"),
+                    "incident_breakdown": result.get("incident_breakdown"),
+                }
             )
 
             return result

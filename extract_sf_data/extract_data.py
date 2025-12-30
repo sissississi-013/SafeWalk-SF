@@ -16,8 +16,8 @@ import json
 load_dotenv()
 
 # Configuration
-API_KEY_ID = os.getenv('API_KEY_ID')
-API_KEY_SECRET = os.getenv('API_KEY_SECRET')
+SF_DATA_API_KEY_ID = os.getenv('SF_DATA_API_KEY_ID')
+SF_DATA_API_KEY_SECRET = os.getenv('SF_DATA_API_KEY_SECRET')
 BASE_URL = "https://data.sfgov.org/resource"
 DB_PATH = "safesf.db"
 
@@ -154,7 +154,7 @@ class SFDataExtractor:
     def __init__(self, db_path: str = DB_PATH):
         self.db_path = db_path
         self.session = requests.Session()
-        self.session.auth = (API_KEY_ID, API_KEY_SECRET)
+        self.session.auth = (SF_DATA_API_KEY_ID, SF_DATA_API_KEY_SECRET)
         self.conn = None
 
     def create_database(self):

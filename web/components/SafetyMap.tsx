@@ -94,29 +94,31 @@ export function SafetyMap({ coordinates, height = '400px', showHeatMap = true, t
 
     if (validCoords.length === 0) return;
 
-    // Add circle markers (faster than icons for many points)
-    validCoords.slice(0, 500).forEach(coord => {
-      const color = CATEGORY_COLORS[coord.category || ''] || CATEGORY_COLORS.default;
+    // Only add circle markers if heat map is disabled
+    if (!showHeatMap) {
+      validCoords.slice(0, 500).forEach(coord => {
+        const color = CATEGORY_COLORS[coord.category || ''] || CATEGORY_COLORS.default;
 
-      L.circleMarker([coord.latitude, coord.longitude], {
-        radius: 5,
-        fillColor: color,
-        color: '#fff',
-        weight: 1,
-        opacity: 1,
-        fillOpacity: 0.7,
-      })
-        .bindPopup(`
-          <div class="text-sm">
-            <strong>${coord.category || 'Incident'}</strong><br/>
-            <span class="text-gray-500">${coord.latitude.toFixed(4)}, ${coord.longitude.toFixed(4)}</span>
-          </div>
-        `)
-        .addTo(markersLayer);
-    });
+        L.circleMarker([coord.latitude, coord.longitude], {
+          radius: 5,
+          fillColor: color,
+          color: '#fff',
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.7,
+        })
+          .bindPopup(`
+            <div class="text-sm">
+              <strong>${coord.category || 'Incident'}</strong><br/>
+              <span class="text-gray-500">${coord.latitude.toFixed(4)}, ${coord.longitude.toFixed(4)}</span>
+            </div>
+          `)
+          .addTo(markersLayer);
+      });
+    }
 
     // Add heat map layer if enabled
-    if (showHeatMap && validCoords.length > 10) {
+    if (showHeatMap && validCoords.length > 0) {
       // Dynamic import for heat map (client-side only)
       import('leaflet.heat').then(() => {
         const heatData = validCoords.map(c => [c.latitude, c.longitude, 1]);
