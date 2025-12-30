@@ -2,6 +2,8 @@
 
 Multi-agent system for querying San Francisco safety data using natural language. Powered by Claude Agent SDK and Snow Leopard AI.
 
+<img width="3584" height="2158" alt="New Results page" src="https://github.com/user-attachments/assets/02cb46fa-7100-4f77-aa0b-117e1bc244f6" />
+
 ## Setup
 
 ### 1. Upload Database to Snow Leopard
