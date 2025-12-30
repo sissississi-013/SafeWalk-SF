@@ -121,6 +121,11 @@ export function SafetyMap({ coordinates, height = '400px', showHeatMap = true, t
     if (showHeatMap && validCoords.length > 0) {
       // Dynamic import for heat map (client-side only)
       import('leaflet.heat').then(() => {
+        // Check if map is still valid (not destroyed)
+        if (!mapInstanceRef.current || !mapRef.current) {
+          return;
+        }
+
         const heatData = validCoords.map(c => [c.latitude, c.longitude, 1]);
         // @ts-expect-error - leaflet.heat adds this method
         const heat = L.heatLayer(heatData, {
@@ -136,15 +141,25 @@ export function SafetyMap({ coordinates, height = '400px', showHeatMap = true, t
             1.0: '#f00',
           },
         });
-        heat.addTo(map);
-        heatLayerRef.current = heat;
+
+        // Double-check map is still valid before adding
+        if (mapInstanceRef.current) {
+          heat.addTo(mapInstanceRef.current);
+          heatLayerRef.current = heat;
+        }
+      }).catch(err => {
+        console.error('Failed to load heat layer:', err);
       });
     }
 
     // Fit bounds to show all markers
-    if (validCoords.length > 0) {
-      const bounds = L.latLngBounds(validCoords.map(c => [c.latitude, c.longitude]));
-      map.fitBounds(bounds, { padding: [50, 50] });
+    if (validCoords.length > 0 && mapInstanceRef.current) {
+      try {
+        const bounds = L.latLngBounds(validCoords.map(c => [c.latitude, c.longitude]));
+        mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+      } catch (err) {
+        console.error('Failed to fit bounds:', err);
+      }
     }
 
     // Cleanup
