@@ -1,6 +1,87 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { LocationInfo, RouteData, DangerZone, DangerSpot, IncidentLocation, Hotspot } from '../types';
 
+// Snap drawn waypoints to actual roads using Google Directions API
+const snapToRoads = async (
+  waypoints: [number, number][],
+  map: google.maps.Map
+): Promise<[number, number][]> => {
+  return new Promise((resolve, reject) => {
+    if (waypoints.length < 2) {
+      resolve(waypoints);
+      return;
+    }
+
+    const directionsService = new google.maps.DirectionsService();
+
+    // Use first point as origin, last as destination
+    const origin = { lat: waypoints[0][0], lng: waypoints[0][1] };
+    const destination = { lat: waypoints[waypoints.length - 1][0], lng: waypoints[waypoints.length - 1][1] };
+
+    // Sample intermediate points as waypoints (max 8 for walking directions)
+    // Google Directions API has a limit on waypoints
+    const intermediateWaypoints: google.maps.DirectionsWaypoint[] = [];
+    if (waypoints.length > 2) {
+      // Sample evenly spaced points from the drawn path
+      const step = Math.max(1, Math.floor((waypoints.length - 2) / 8));
+      for (let i = 1; i < waypoints.length - 1; i += step) {
+        if (intermediateWaypoints.length < 8) {
+          intermediateWaypoints.push({
+            location: { lat: waypoints[i][0], lng: waypoints[i][1] },
+            stopover: false,
+          });
+        }
+      }
+    }
+
+    console.log('Requesting directions with', intermediateWaypoints.length, 'intermediate waypoints');
+
+    directionsService.route(
+      {
+        origin: origin,
+        destination: destination,
+        waypoints: intermediateWaypoints,
+        travelMode: google.maps.TravelMode.WALKING,
+        optimizeWaypoints: false, // Keep the order the user drew
+      },
+      (result, status) => {
+        if (status === google.maps.DirectionsStatus.OK && result) {
+          // Extract the snapped path from the route
+          const snappedPath: [number, number][] = [];
+          const route = result.routes[0];
+
+          if (route && route.overview_path) {
+            route.overview_path.forEach((point) => {
+              snappedPath.push([point.lat(), point.lng()]);
+            });
+          }
+
+          if (snappedPath.length > 0) {
+            resolve(snappedPath);
+          } else {
+            // Fall back to original if no path returned
+            resolve(waypoints);
+          }
+        } else {
+          console.error('Directions request failed:', status);
+          reject(new Error(`Directions request failed: ${status}`));
+        }
+      }
+    );
+  });
+};
+
+interface CustomRouteAnalysis {
+  safetyScore: number;
+  rating: string;
+  incidents: {
+    violent_crimes: number;
+    property_crimes: number;
+    encampments: number;
+    traffic_injuries: number;
+  };
+}
+
 interface MapComponentProps {
   startLocation: LocationInfo | null;
   endLocation: LocationInfo | null;
@@ -13,7 +94,9 @@ interface MapComponentProps {
   hotspots?: Hotspot[];
   drawingMode?: boolean;
   onDrawingComplete?: (waypoints: [number, number][]) => void;
+  onSnappingToRoads?: (isSnapping: boolean) => void;
   customRouteWaypoints?: [number, number][] | null;
+  customRouteAnalysis?: CustomRouteAnalysis | null;
 }
 
 const MapComponent: React.FC<MapComponentProps> = ({
@@ -28,7 +111,9 @@ const MapComponent: React.FC<MapComponentProps> = ({
   hotspots = [],
   drawingMode = false,
   onDrawingComplete,
+  onSnappingToRoads,
   customRouteWaypoints = null,
+  customRouteAnalysis = null,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -84,7 +169,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
     manager.setMap(map);
 
     // Listen for polyline completion
-    google.maps.event.addListener(manager, 'polylinecomplete', (polyline: google.maps.Polyline) => {
+    google.maps.event.addListener(manager, 'polylinecomplete', async (polyline: google.maps.Polyline) => {
       console.log('Polyline complete event fired');
 
       // Clear any previous drawn polyline
@@ -95,24 +180,55 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
       // Extract waypoints from the polyline
       const path = polyline.getPath();
-      const waypoints: [number, number][] = [];
+      const rawWaypoints: [number, number][] = [];
       for (let i = 0; i < path.getLength(); i++) {
         const point = path.getAt(i);
-        waypoints.push([point.lat(), point.lng()]);
+        rawWaypoints.push([point.lat(), point.lng()]);
       }
 
-      console.log('Extracted waypoints:', waypoints.length);
+      console.log('Extracted raw waypoints:', rawWaypoints.length);
 
       // Stop drawing mode after completion
       manager.setDrawingMode(null);
 
-      // Notify parent of the drawn route
-      if (onDrawingComplete && waypoints.length >= 2) {
-        onDrawingComplete(waypoints);
+      // Remove the drawn polyline from map immediately
+      polyline.setMap(null);
+
+      if (rawWaypoints.length < 2) {
+        console.log('Not enough waypoints');
+        return;
       }
 
-      // Remove the drawn polyline from map (it will be redrawn as customRoutePolyline)
-      polyline.setMap(null);
+      // Snap the route to roads using Directions API
+      try {
+        // Notify parent that snapping has started
+        if (onSnappingToRoads) {
+          onSnappingToRoads(true);
+        }
+
+        const snappedWaypoints = await snapToRoads(rawWaypoints, map);
+        console.log('Snapped waypoints:', snappedWaypoints.length);
+
+        // Notify parent that snapping is done
+        if (onSnappingToRoads) {
+          onSnappingToRoads(false);
+        }
+
+        // Notify parent of the snapped route
+        if (onDrawingComplete && snappedWaypoints.length >= 2) {
+          onDrawingComplete(snappedWaypoints);
+        }
+      } catch (error) {
+        console.error('Failed to snap to roads:', error);
+        // Notify parent that snapping is done (even on error)
+        if (onSnappingToRoads) {
+          onSnappingToRoads(false);
+        }
+        // Fall back to original waypoints if snapping fails
+        if (onDrawingComplete) {
+          onDrawingComplete(rawWaypoints);
+        }
+      }
     });
 
     setDrawingManager(manager);
@@ -161,7 +277,49 @@ const MapComponent: React.FC<MapComponentProps> = ({
         strokeWeight: 6,
         map: map,
         zIndex: 15,
+        clickable: true,
       });
+
+      // Add info window for custom route
+      if (customRouteAnalysis) {
+        const scoreColor = customRouteAnalysis.safetyScore >= 7 ? '#10b981' :
+                          customRouteAnalysis.safetyScore >= 4 ? '#f59e0b' : '#ef4444';
+        const totalIncidents = customRouteAnalysis.incidents.violent_crimes +
+                              customRouteAnalysis.incidents.property_crimes +
+                              customRouteAnalysis.incidents.encampments +
+                              customRouteAnalysis.incidents.traffic_injuries;
+
+        const infoWindow = new google.maps.InfoWindow({
+          content: `
+            <div style="padding: 10px; font-family: Inter, sans-serif; min-width: 180px;">
+              <h3 style="font-weight: bold; color: #1e293b; margin: 0 0 6px 0; font-size: 14px;">
+                Your Custom Route
+              </h3>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="background: ${scoreColor}; color: white; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;">
+                  ${customRouteAnalysis.safetyScore.toFixed(1)}/10
+                </span>
+                <span style="color: #64748b; font-size: 12px;">${customRouteAnalysis.rating}</span>
+              </div>
+              <div style="font-size: 11px; color: #475569; line-height: 1.6;">
+                <div><strong style="color: #dc2626;">${customRouteAnalysis.incidents.violent_crimes}</strong> violent crimes</div>
+                <div><strong style="color: #f97316;">${customRouteAnalysis.incidents.property_crimes}</strong> property crimes</div>
+                <div><strong style="color: #8b5cf6;">${customRouteAnalysis.incidents.encampments}</strong> encampments</div>
+                <div><strong style="color: #eab308;">${customRouteAnalysis.incidents.traffic_injuries}</strong> traffic incidents</div>
+              </div>
+              <p style="color: #94a3b8; font-size: 10px; margin: 8px 0 0 0; border-top: 1px solid #e2e8f0; padding-top: 6px;">
+                ${totalIncidents} total incidents in area
+              </p>
+            </div>
+          `
+        });
+
+        polyline.addListener('click', (e: any) => {
+          infoWindow.setPosition(e.latLng);
+          infoWindow.open(map);
+        });
+      }
+
       setCustomRoutePolyline(polyline);
 
       // Fit bounds to show the custom route
@@ -173,7 +331,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
     } else {
       setCustomRoutePolyline(null);
     }
-  }, [map, customRouteWaypoints]);
+  }, [map, customRouteWaypoints, customRouteAnalysis]);
 
   // Update start/end markers
   useEffect(() => {

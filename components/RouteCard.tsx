@@ -173,20 +173,24 @@ const RouteCard: React.FC<RouteCardProps> = ({ route, isSelected, onSelect }) =>
           {/* Crime Statistics */}
           <div className="mt-4 mb-4">
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Monthly Crime Incidents (Est.)
+              Incidents Along Route (60 days)
             </h4>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               <div className="bg-red-50 rounded-lg p-2 text-center">
                 <div className="text-lg font-bold text-red-600">{safety.crimeIncidents.robbery}</div>
-                <div className="text-xs text-red-600">Robberies</div>
+                <div className="text-[10px] text-red-600">Robberies</div>
               </div>
               <div className="bg-orange-50 rounded-lg p-2 text-center">
                 <div className="text-lg font-bold text-orange-600">{safety.crimeIncidents.assault}</div>
-                <div className="text-xs text-orange-600">Assaults</div>
+                <div className="text-[10px] text-orange-600">Assaults</div>
               </div>
               <div className="bg-amber-50 rounded-lg p-2 text-center">
                 <div className="text-lg font-bold text-amber-600">{safety.crimeIncidents.theft}</div>
-                <div className="text-xs text-amber-600">Thefts</div>
+                <div className="text-[10px] text-amber-600">Thefts</div>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-2 text-center">
+                <div className="text-lg font-bold text-purple-600">{safety.encampments || 0}</div>
+                <div className="text-[10px] text-purple-600">Encampments</div>
               </div>
             </div>
           </div>

@@ -130,9 +130,27 @@ User Query → Orchestrator Agent
 ## Features
 
 - **Safe Route Planning**: Find the safest walking route between two locations
+- **Custom Route Drawing**: Draw your own route on the map with automatic road snapping
 - **Real-time Database**: 49,000+ incident records queried in real-time
 - **Map Visualization**: See incidents and hotspots along your route
 - **Safety Scoring**: Routes scored on a 0-10 scale based on actual crime data
+- **Resizable Sidebar**: Drag to resize the sidebar panel to your preference
+- **Collapsible Search**: Search header collapses when scrolling for more map visibility
+
+## Custom Route Drawing
+
+Draw your own walking route and get instant safety analysis:
+
+1. Click **"Draw Route"** to enter drawing mode
+2. Click points on the map to create your path
+3. Double-click or click **"Finish"** to complete
+4. Your route automatically snaps to actual roads using Google Directions API
+5. View safety analysis with the same metrics as generated routes:
+   - Safety score (0-10)
+   - Time and distance estimates
+   - Homeless activity, lighting, and police presence indicators
+   - Incident breakdown (violent crimes, property crimes, encampments, traffic)
+   - Pros, cons, and recommendations
 
 ## Running SafeWalk SF
 

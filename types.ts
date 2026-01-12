@@ -16,6 +16,8 @@ export interface SafetyDetails {
     assault: number;
     theft: number;
   };
+  encampments: number;
+  trafficIncidents: number;
   lighting: 'Well-lit' | 'Moderate' | 'Poorly-lit';
   crowdLevel: 'Busy' | 'Moderate' | 'Isolated';
   policePresence: 'High' | 'Moderate' | 'Low';
