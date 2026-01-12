@@ -75,8 +75,9 @@ const MapComponent: React.FC<MapComponentProps> = ({
         strokeColor: '#8b5cf6', // Purple for custom route
         strokeOpacity: 1.0,
         strokeWeight: 5,
-        editable: true,
-        draggable: true,
+        editable: false,
+        draggable: false,
+        clickable: true,
       },
     });
 
@@ -84,6 +85,8 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
     // Listen for polyline completion
     google.maps.event.addListener(manager, 'polylinecomplete', (polyline: google.maps.Polyline) => {
+      console.log('Polyline complete event fired');
+
       // Clear any previous drawn polyline
       if (drawnPolyline) {
         drawnPolyline.setMap(null);
@@ -98,13 +101,18 @@ const MapComponent: React.FC<MapComponentProps> = ({
         waypoints.push([point.lat(), point.lng()]);
       }
 
+      console.log('Extracted waypoints:', waypoints.length);
+
       // Stop drawing mode after completion
       manager.setDrawingMode(null);
 
       // Notify parent of the drawn route
-      if (onDrawingComplete) {
+      if (onDrawingComplete && waypoints.length >= 2) {
         onDrawingComplete(waypoints);
       }
+
+      // Remove the drawn polyline from map (it will be redrawn as customRoutePolyline)
+      polyline.setMap(null);
     });
 
     setDrawingManager(manager);
@@ -120,13 +128,17 @@ const MapComponent: React.FC<MapComponentProps> = ({
         drawnPolyline.setMap(null);
         setDrawnPolyline(null);
       }
+      // Clear the analyzed custom route polyline when starting new drawing
       if (customRoutePolyline) {
         customRoutePolyline.setMap(null);
         setCustomRoutePolyline(null);
       }
+      // Keep existing generated routes visible - don't clear them
       drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYLINE);
+      console.log('Drawing mode enabled');
     } else {
       drawingManager.setDrawingMode(null);
+      console.log('Drawing mode disabled');
     }
   }, [drawingMode, drawingManager]);
 

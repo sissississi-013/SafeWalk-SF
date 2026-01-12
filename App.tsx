@@ -134,22 +134,31 @@ const App: React.FC = () => {
 
   // Handle custom route drawing completion
   const handleDrawingComplete = async (waypoints: [number, number][]) => {
+    console.log('Drawing complete, waypoints:', waypoints.length);
     setDrawingMode(false);
+
+    if (waypoints.length < 2) {
+      setError('Please draw a route with at least 2 points.');
+      return;
+    }
+
     setCustomRouteWaypoints(waypoints);
     setAnalyzingCustomRoute(true);
     setCustomRouteAnalysis(null);
 
-    // Clear generated routes when analyzing custom route
-    setRoutes([]);
-    setSelectedRouteId(null);
-
     try {
       const analysis = await analyzeCustomRoute(waypoints, 60, 300);
+      console.log('Analysis result:', analysis);
       if (analysis) {
         setCustomRouteAnalysis(analysis);
-        // Update incidents and hotspots for map display
-        setIncidentLocations(analysis.incidentLocations);
-        setHotspots(analysis.hotspots);
+        // Add custom route incidents to existing ones
+        const existingIncidents = [...incidentLocations];
+        const existingHotspots = [...hotspots];
+        // Merge without duplicates (simple approach - add all from custom)
+        setIncidentLocations([...existingIncidents, ...analysis.incidentLocations]);
+        setHotspots([...existingHotspots, ...analysis.hotspots]);
+      } else {
+        setError('Could not analyze the route. Make sure the backend server is running.');
       }
     } catch (err) {
       console.error('Failed to analyze custom route:', err);
@@ -163,8 +172,11 @@ const App: React.FC = () => {
   const clearCustomRoute = () => {
     setCustomRouteWaypoints(null);
     setCustomRouteAnalysis(null);
-    setIncidentLocations([]);
-    setHotspots([]);
+    // Don't clear all incidents - only clear if no routes exist
+    if (routes.length === 0) {
+      setIncidentLocations([]);
+      setHotspots([]);
+    }
   };
 
   // Toggle drawing mode
@@ -172,10 +184,9 @@ const App: React.FC = () => {
     if (drawingMode) {
       setDrawingMode(false);
     } else {
-      // Clear previous results when starting to draw
-      clearCustomRoute();
-      setRoutes([]);
-      setSelectedRouteId(null);
+      // Clear only the previous custom route, keep generated routes
+      setCustomRouteWaypoints(null);
+      setCustomRouteAnalysis(null);
       setDrawingMode(true);
     }
   };
@@ -231,11 +242,10 @@ const App: React.FC = () => {
 
           <button
             onClick={handleSearch}
-            disabled={!!loadingStep || drawingMode}
+            disabled={!!loadingStep}
             className={clsx(
               "w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-500/20",
-              loadingStep ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]",
-              drawingMode && "opacity-50 cursor-not-allowed"
+              loadingStep ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
             )}
           >
             {loadingStep ? (
@@ -279,7 +289,8 @@ const App: React.FC = () => {
           {drawingMode && (
             <div className="p-3 bg-purple-50 text-purple-700 text-sm rounded-lg border border-purple-200">
               <p className="font-semibold mb-1">Drawing Mode Active</p>
-              <p>Click on the map to draw your route. Double-click to finish.</p>
+              <p className="mb-2">1. Click on the map to add points to your route</p>
+              <p>2. <strong>Double-click</strong> on the last point to finish drawing</p>
             </div>
           )}
 
