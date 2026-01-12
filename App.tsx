@@ -137,13 +137,10 @@ const App: React.FC = () => {
 
         {/* Header */}
         <div className="p-6 pb-4 border-b border-slate-100 bg-white sticky top-0 z-10">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="bg-blue-600 text-white p-2 rounded-lg">
-              <Navigation className="w-5 h-5" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-800">SafeWalk SF</h1>
+          <div className="flex items-center justify-center mb-2">
+            <img src="/logo.png" alt="SafeWalk SF" className="h-10" />
           </div>
-          <p className="text-slate-500 text-sm">AI-powered safe pedestrian routing with real-time danger alerts.</p>
+          <p className="text-slate-500 text-sm text-center">AI-powered safe pedestrian routing with real-time danger alerts.</p>
         </div>
 
         {/* Inputs */}

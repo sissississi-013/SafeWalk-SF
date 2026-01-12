@@ -114,9 +114,15 @@ User Query → Orchestrator Agent
 
 ---
 
-# SafeWalk SF - Pedestrian Route Safety
+<p align="center">
+  <img src="public/logo.png" alt="SafeWalk SF" width="400" />
+</p>
 
-Interactive web app for finding safe walking routes in San Francisco. Uses real incident data to score and visualize route safety.
+<p align="center">
+  <strong>Pedestrian Route Safety</strong><br>
+  Interactive web app for finding safe walking routes in San Francisco.<br>
+  Uses real incident data to score and visualize route safety.
+</p>
 
 ## Features
 
