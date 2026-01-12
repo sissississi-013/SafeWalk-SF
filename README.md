@@ -1,6 +1,6 @@
-# SafeSF - San Francisco Safety Analysis
-
-<img width="1050" height="300" alt="SafeSF" src="https://github.com/user-attachments/assets/a312a514-3c23-462c-9bd7-bcbb6549e41e" />
+# SafeSF - Stay Safe in San Francisco!
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/a312a514-3c23-462c-9bd7-bcbb6549e41e" alt="Safe SF" width="400" />
 
 Multi-agent system for querying San Francisco safety data using natural language. Powered by Claude Agent SDK and Snow Leopard AI.
 
