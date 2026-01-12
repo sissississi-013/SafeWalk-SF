@@ -141,6 +141,8 @@ User Query → Orchestrator Agent
 
 Draw your own walking route and get instant safety analysis:
 
+<img width="1470" height="798" alt="image" src="https://github.com/user-attachments/assets/ca3186ff-2245-43eb-929b-31ca31853b0e" />
+
 1. Click **"Draw Route"** to enter drawing mode
 2. Click points on the map to create your path
 3. Double-click or click **"Finish"** to complete
