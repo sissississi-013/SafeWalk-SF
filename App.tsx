@@ -137,7 +137,7 @@ const App: React.FC = () => {
 
         {/* Header */}
         <div className="p-6 pb-4 border-b border-slate-100 bg-white sticky top-0 z-10">
-          <div className="flex items-center justify-center mb-2">
+          <div className="flex items-center justify-center mb-1">
             <img src="/logo.png" alt="SafeWalk SF" className="h-10" />
           </div>
           <p className="text-slate-500 text-sm text-center">AI-powered safe pedestrian routing with real-time danger alerts.</p>
