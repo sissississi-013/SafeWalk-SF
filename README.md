@@ -145,12 +145,17 @@ npm run setup
 
 ### Configuration
 
-1. Copy `.env.local.example` to `.env.local` and add your API keys:
+1. **Google Maps API Key**: Open `index.html` and replace `YOUR_GOOGLE_MAPS_API_KEY` with your actual Google Maps API key:
+   ```html
+   <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places,geometry"></script>
+   ```
+
+2. Copy `.env.local.example` to `.env.local` and add your API keys:
    ```
    GEMINI_API_KEY=your_gemini_api_key
    ```
 
-2. (Optional) Copy `backend/.env.example` to `backend/.env` for AI queries:
+3. (Optional) Copy `backend/.env.example` to `backend/.env` for AI queries:
    ```
    ANTHROPIC_API_KEY=your_anthropic_api_key
    ```
