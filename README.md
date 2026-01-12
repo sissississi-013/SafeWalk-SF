@@ -1,7 +1,4 @@
 # SafeSF - San Francisco Safety Analysis
-<p align="center">
-  <img src="public/logo.png" alt="SafeWalk SF" width="400" />
-</p>
 
 Multi-agent system for querying San Francisco safety data using natural language. Powered by Claude Agent SDK and Snow Leopard AI.
 
@@ -116,13 +113,17 @@ User Query → Orchestrator Agent
 ```
 
 ---
-<img width="1470" height="799" alt="image" src="https://github.com/user-attachments/assets/e0845ce6-09f6-40d6-87d6-490346ab36ce" />
-
+<p align="center">
+  <img src="public/logo.png" alt="SafeWalk SF" width="400" />
+  
 <p align="center">
   <strong>Pedestrian Route Safety</strong><br>
   Interactive web app for finding safe walking routes in San Francisco.<br>
   Uses real incident data to score and visualize route safety.
 </p>
+  
+</p>
+<img width="1470" height="799" alt="image" src="https://github.com/user-attachments/assets/e0845ce6-09f6-40d6-87d6-490346ab36ce" />
 
 ## Features
 
