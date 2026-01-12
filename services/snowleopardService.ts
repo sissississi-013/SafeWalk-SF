@@ -380,6 +380,51 @@ export const analyzeRoutes = async (
  * Updates route types and risk levels based on real safety scores.
  * Returns routes sorted by safety score (safest first).
  */
+/**
+ * Analyze a single custom-drawn route.
+ * Returns safety analysis for user-drawn paths.
+ */
+export const analyzeCustomRoute = async (
+  waypoints: [number, number][],
+  daysBack: number = 60,
+  radiusMeters: number = 200
+): Promise<RouteAnalysis | null> => {
+  console.log('Analyzing custom drawn route...', waypoints.length, 'points');
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/analyze-routes`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        routes: [{
+          id: 'custom-route',
+          name: 'Your Custom Route',
+          waypoints: waypoints,
+        }],
+        days_back: daysBack,
+        radius_meters: radiusMeters,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data: AnalyzeRoutesResponse = await response.json();
+    console.log(`Custom route analysis complete in ${data.queryTimeMs}ms`);
+
+    if (data.routes.length > 0) {
+      return data.routes[0];
+    }
+    return null;
+  } catch (error) {
+    console.warn('Custom route analysis failed:', error);
+    return null;
+  }
+};
+
 export const mergeRouteAnalysis = (
   routes: RouteData[],
   analysis: AnalyzeRoutesResponse

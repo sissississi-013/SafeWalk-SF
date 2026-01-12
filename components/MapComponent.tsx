@@ -11,6 +11,9 @@ interface MapComponentProps {
   dangerSpots: DangerSpot[];
   incidentLocations?: IncidentLocation[];
   hotspots?: Hotspot[];
+  drawingMode?: boolean;
+  onDrawingComplete?: (waypoints: [number, number][]) => void;
+  customRouteWaypoints?: [number, number][] | null;
 }
 
 const MapComponent: React.FC<MapComponentProps> = ({
@@ -23,6 +26,9 @@ const MapComponent: React.FC<MapComponentProps> = ({
   dangerSpots,
   incidentLocations = [],
   hotspots = [],
+  drawingMode = false,
+  onDrawingComplete,
+  customRouteWaypoints = null,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -32,6 +38,9 @@ const MapComponent: React.FC<MapComponentProps> = ({
   const [dangerMarkers, setDangerMarkers] = useState<google.maps.Marker[]>([]);
   const [incidentMarkers, setIncidentMarkers] = useState<google.maps.Marker[]>([]);
   const [hotspotCircles, setHotspotCircles] = useState<google.maps.Circle[]>([]);
+  const [drawingManager, setDrawingManager] = useState<google.maps.drawing.DrawingManager | null>(null);
+  const [drawnPolyline, setDrawnPolyline] = useState<google.maps.Polyline | null>(null);
+  const [customRoutePolyline, setCustomRoutePolyline] = useState<google.maps.Polyline | null>(null);
 
   // Initialize map
   useEffect(() => {
@@ -54,6 +63,105 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
     setMap(googleMap);
   }, []);
+
+  // Initialize Drawing Manager
+  useEffect(() => {
+    if (!map || drawingManager) return;
+
+    const manager = new google.maps.drawing.DrawingManager({
+      drawingMode: null,
+      drawingControl: false, // We'll control this ourselves
+      polylineOptions: {
+        strokeColor: '#8b5cf6', // Purple for custom route
+        strokeOpacity: 1.0,
+        strokeWeight: 5,
+        editable: true,
+        draggable: true,
+      },
+    });
+
+    manager.setMap(map);
+
+    // Listen for polyline completion
+    google.maps.event.addListener(manager, 'polylinecomplete', (polyline: google.maps.Polyline) => {
+      // Clear any previous drawn polyline
+      if (drawnPolyline) {
+        drawnPolyline.setMap(null);
+      }
+      setDrawnPolyline(polyline);
+
+      // Extract waypoints from the polyline
+      const path = polyline.getPath();
+      const waypoints: [number, number][] = [];
+      for (let i = 0; i < path.getLength(); i++) {
+        const point = path.getAt(i);
+        waypoints.push([point.lat(), point.lng()]);
+      }
+
+      // Stop drawing mode after completion
+      manager.setDrawingMode(null);
+
+      // Notify parent of the drawn route
+      if (onDrawingComplete) {
+        onDrawingComplete(waypoints);
+      }
+    });
+
+    setDrawingManager(manager);
+  }, [map]);
+
+  // Toggle drawing mode
+  useEffect(() => {
+    if (!drawingManager) return;
+
+    if (drawingMode) {
+      // Clear previous drawn polyline when entering drawing mode
+      if (drawnPolyline) {
+        drawnPolyline.setMap(null);
+        setDrawnPolyline(null);
+      }
+      if (customRoutePolyline) {
+        customRoutePolyline.setMap(null);
+        setCustomRoutePolyline(null);
+      }
+      drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYLINE);
+    } else {
+      drawingManager.setDrawingMode(null);
+    }
+  }, [drawingMode, drawingManager]);
+
+  // Display custom route after analysis
+  useEffect(() => {
+    if (!map) return;
+
+    // Clear previous custom route polyline
+    if (customRoutePolyline) {
+      customRoutePolyline.setMap(null);
+    }
+
+    if (customRouteWaypoints && customRouteWaypoints.length > 0) {
+      const path = customRouteWaypoints.map(wp => ({ lat: wp[0], lng: wp[1] }));
+      const polyline = new google.maps.Polyline({
+        path: path,
+        geodesic: true,
+        strokeColor: '#8b5cf6', // Purple
+        strokeOpacity: 1.0,
+        strokeWeight: 6,
+        map: map,
+        zIndex: 15,
+      });
+      setCustomRoutePolyline(polyline);
+
+      // Fit bounds to show the custom route
+      const bounds = new google.maps.LatLngBounds();
+      customRouteWaypoints.forEach(wp => {
+        bounds.extend({ lat: wp[0], lng: wp[1] });
+      });
+      map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
+    } else {
+      setCustomRoutePolyline(null);
+    }
+  }, [map, customRouteWaypoints]);
 
   // Update start/end markers
   useEffect(() => {

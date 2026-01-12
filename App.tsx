@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, Search, AlertCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { MapPin, Navigation, Search, AlertCircle, Loader2, AlertTriangle, Pencil, X, Shield, Users, Lightbulb, BadgeAlert, Check } from 'lucide-react';
 import MapComponent from './components/MapComponent';
 import RouteCard from './components/RouteCard';
 import { getGeocode, generateRoutes } from './services/geminiService';
-import { analyzeRoutes, mergeRouteAnalysis } from './services/snowleopardService';
+import { analyzeRoutes, mergeRouteAnalysis, analyzeCustomRoute } from './services/snowleopardService';
 import { LocationInfo, RouteData, Coordinate, DangerZone, DangerSpot, RouteAnalysis, IncidentLocation, Hotspot } from './types';
 import clsx from 'clsx';
 
@@ -27,6 +27,12 @@ const App: React.FC = () => {
   const [loadingStep, setLoadingStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userCoords, setUserCoords] = useState<Coordinate | null>(null);
+
+  // Custom drawing mode state
+  const [drawingMode, setDrawingMode] = useState(false);
+  const [customRouteWaypoints, setCustomRouteWaypoints] = useState<[number, number][] | null>(null);
+  const [customRouteAnalysis, setCustomRouteAnalysis] = useState<RouteAnalysis | null>(null);
+  const [analyzingCustomRoute, setAnalyzingCustomRoute] = useState(false);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -126,6 +132,54 @@ const App: React.FC = () => {
     window.open(url, '_blank');
   };
 
+  // Handle custom route drawing completion
+  const handleDrawingComplete = async (waypoints: [number, number][]) => {
+    setDrawingMode(false);
+    setCustomRouteWaypoints(waypoints);
+    setAnalyzingCustomRoute(true);
+    setCustomRouteAnalysis(null);
+
+    // Clear generated routes when analyzing custom route
+    setRoutes([]);
+    setSelectedRouteId(null);
+
+    try {
+      const analysis = await analyzeCustomRoute(waypoints, 60, 300);
+      if (analysis) {
+        setCustomRouteAnalysis(analysis);
+        // Update incidents and hotspots for map display
+        setIncidentLocations(analysis.incidentLocations);
+        setHotspots(analysis.hotspots);
+      }
+    } catch (err) {
+      console.error('Failed to analyze custom route:', err);
+      setError('Failed to analyze your custom route. Please try again.');
+    } finally {
+      setAnalyzingCustomRoute(false);
+    }
+  };
+
+  // Clear custom route
+  const clearCustomRoute = () => {
+    setCustomRouteWaypoints(null);
+    setCustomRouteAnalysis(null);
+    setIncidentLocations([]);
+    setHotspots([]);
+  };
+
+  // Toggle drawing mode
+  const toggleDrawingMode = () => {
+    if (drawingMode) {
+      setDrawingMode(false);
+    } else {
+      // Clear previous results when starting to draw
+      clearCustomRoute();
+      setRoutes([]);
+      setSelectedRouteId(null);
+      setDrawingMode(true);
+    }
+  };
+
   const totalDangerAreas = dangerZones.length + dangerSpots.length;
   const totalIncidents = incidentLocations.length;
 
@@ -177,10 +231,11 @@ const App: React.FC = () => {
 
           <button
             onClick={handleSearch}
-            disabled={!!loadingStep}
+            disabled={!!loadingStep || drawingMode}
             className={clsx(
               "w-full py-3 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-500/20",
-              loadingStep ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]"
+              loadingStep ? "bg-blue-400 cursor-wait" : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98]",
+              drawingMode && "opacity-50 cursor-not-allowed"
             )}
           >
             {loadingStep ? (
@@ -195,6 +250,46 @@ const App: React.FC = () => {
               </>
             )}
           </button>
+
+          {/* Draw Your Route Button */}
+          <button
+            onClick={toggleDrawingMode}
+            disabled={!!loadingStep || analyzingCustomRoute}
+            className={clsx(
+              "w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all border-2",
+              drawingMode
+                ? "bg-purple-600 text-white border-purple-600"
+                : "bg-white text-purple-600 border-purple-300 hover:border-purple-500 hover:bg-purple-50"
+            )}
+          >
+            {drawingMode ? (
+              <>
+                <X className="w-5 h-5" />
+                Cancel Drawing
+              </>
+            ) : (
+              <>
+                <Pencil className="w-5 h-5" />
+                Draw Your Own Route
+              </>
+            )}
+          </button>
+
+          {/* Drawing Mode Instructions */}
+          {drawingMode && (
+            <div className="p-3 bg-purple-50 text-purple-700 text-sm rounded-lg border border-purple-200">
+              <p className="font-semibold mb-1">Drawing Mode Active</p>
+              <p>Click on the map to draw your route. Double-click to finish.</p>
+            </div>
+          )}
+
+          {/* Analyzing Custom Route */}
+          {analyzingCustomRoute && (
+            <div className="p-3 bg-purple-50 text-purple-600 text-sm rounded-lg flex items-center gap-2 border border-purple-200">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Analyzing your custom route...
+            </div>
+          )}
 
           {error && (
             <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2 border border-red-100">
@@ -255,6 +350,137 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Custom Route Analysis Results */}
+        {customRouteAnalysis && (
+          <div className="p-6 pt-0 flex-1 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xs font-bold text-purple-600 uppercase tracking-wider">
+                Your Custom Route
+              </h2>
+              <button
+                onClick={clearCustomRoute}
+                className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
+              >
+                <X className="w-3 h-3" />
+                Clear
+              </button>
+            </div>
+
+            {/* Custom Route Card */}
+            <div className="bg-purple-50 border-2 border-purple-400 rounded-2xl overflow-hidden">
+              <div className="p-4">
+                {/* Header */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-xl text-purple-600 bg-purple-100">
+                    <Pencil className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900">Your Custom Route</h3>
+                    <p className="text-sm text-gray-500">Hand-drawn path analysis</p>
+                  </div>
+                </div>
+
+                {/* Safety Score */}
+                <div className="mb-3">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-medium text-gray-500">Safety Score</span>
+                    <span className={clsx(
+                      "text-lg font-bold",
+                      customRouteAnalysis.safetyScore >= 7 ? "text-emerald-600" :
+                      customRouteAnalysis.safetyScore >= 4 ? "text-amber-600" : "text-red-600"
+                    )}>
+                      {customRouteAnalysis.safetyScore.toFixed(1)}/10
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={clsx(
+                        "h-full rounded-full transition-all duration-500",
+                        customRouteAnalysis.safetyScore >= 7 ? "bg-emerald-500" :
+                        customRouteAnalysis.safetyScore >= 4 ? "bg-amber-500" : "bg-red-500"
+                      )}
+                      style={{ width: `${Math.min(100, customRouteAnalysis.safetyScore * 10)}%` }}
+                    />
+                  </div>
+                  <p className={clsx(
+                    "text-sm font-semibold mt-1",
+                    customRouteAnalysis.safetyScore >= 7 ? "text-emerald-600" :
+                    customRouteAnalysis.safetyScore >= 4 ? "text-amber-600" : "text-red-600"
+                  )}>
+                    {customRouteAnalysis.rating}
+                  </p>
+                </div>
+
+                {/* Incident Counts */}
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  <div className="text-center p-2 bg-red-50 rounded-lg">
+                    <div className="text-lg font-bold text-red-600">{customRouteAnalysis.incidents.violent_crimes}</div>
+                    <div className="text-[10px] text-red-600">Violent</div>
+                  </div>
+                  <div className="text-center p-2 bg-orange-50 rounded-lg">
+                    <div className="text-lg font-bold text-orange-600">{customRouteAnalysis.incidents.property_crimes}</div>
+                    <div className="text-[10px] text-orange-600">Property</div>
+                  </div>
+                  <div className="text-center p-2 bg-purple-50 rounded-lg">
+                    <div className="text-lg font-bold text-purple-600">{customRouteAnalysis.incidents.encampments}</div>
+                    <div className="text-[10px] text-purple-600">Encampment</div>
+                  </div>
+                  <div className="text-center p-2 bg-amber-50 rounded-lg">
+                    <div className="text-lg font-bold text-amber-600">{customRouteAnalysis.incidents.traffic_injuries}</div>
+                    <div className="text-[10px] text-amber-600">Traffic</div>
+                  </div>
+                </div>
+
+                {/* Pros */}
+                {customRouteAnalysis.pros.length > 0 && (
+                  <div className="mb-3">
+                    <h4 className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Positives
+                    </h4>
+                    <ul className="space-y-1">
+                      {customRouteAnalysis.pros.slice(0, 3).map((pro, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                          <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                          <span>{pro}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Cons */}
+                {customRouteAnalysis.cons.length > 0 && (
+                  <div className="mb-3">
+                    <h4 className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <X className="w-3 h-3" /> Concerns
+                    </h4>
+                    <ul className="space-y-1">
+                      {customRouteAnalysis.cons.slice(0, 3).map((con, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                          <X className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                          <span>{con}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                {customRouteAnalysis.recommendations.length > 0 && (
+                  <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                      Recommendation
+                    </h4>
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      {customRouteAnalysis.recommendations[0]}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Map Container */}
@@ -269,13 +495,22 @@ const App: React.FC = () => {
           dangerSpots={dangerSpots}
           incidentLocations={incidentLocations}
           hotspots={hotspots}
+          drawingMode={drawingMode}
+          onDrawingComplete={handleDrawingComplete}
+          customRouteWaypoints={customRouteWaypoints}
         />
 
         {/* Map Legend */}
-        {(routes.length > 0 || totalDangerAreas > 0 || totalIncidents > 0) && (
+        {(routes.length > 0 || totalDangerAreas > 0 || totalIncidents > 0 || customRouteWaypoints) && (
           <div className="absolute bottom-6 right-6 bg-white/95 backdrop-blur rounded-xl shadow-lg p-4 z-10">
             <h3 className="text-xs font-bold text-slate-500 uppercase mb-2">Legend</h3>
             <div className="space-y-2 text-sm">
+              {customRouteWaypoints && (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-1 bg-purple-500 rounded"></div>
+                  <span className="text-slate-600">Your Custom Route</span>
+                </div>
+              )}
               {routes.length > 0 && (
                 <>
                   <div className="flex items-center gap-2">
